@@ -1,0 +1,35 @@
+services:
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - wa-relay
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    environment:
+      MONGODB_URI: mongodb://mongo:27017/wa-relay
+      BAILEYS_AUTH_DIR: /app/baileys_auth
+    volumes:
+      - baileys_auth:/app/baileys_auth
+      - ./backend/config:/app/config:ro
+    depends_on:
+      - mongo
+    networks:
+      - wa-relay
+
+volumes:
+  mongo_data:
+  baileys_auth:
+
+networks:
+  wa-relay:

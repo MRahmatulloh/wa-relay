@@ -1,0 +1,15 @@
+node_modules/
+.env
+backend/auth_info/
+backend/baileys_auth/
+*.log
+.DS_Store
+.idea/
+.vscode/
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/app/google-services.json
+.tools/
+mongo_data/

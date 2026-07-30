@@ -1,7 +1,6 @@
 import Foundation
 import SocketIO
 
-@MainActor
 final class SocketManagerService {
     private var manager: SocketManager?
     private var socket: SocketIOClient?
@@ -12,10 +11,12 @@ final class SocketManagerService {
         let host = UserPreferences.hostURL()
         guard let url = URL(string: host) else { return }
 
+        // Backend accepts handshake.auth.token OR query.token.
+        // Use connect(withPayload:) for auth; connectParams as query fallback.
         let config: SocketIOClientConfiguration = [
             .forceNew(true),
             .reconnects(true),
-            .auth(["token": token]),
+            .connectParams(["token": token]),
         ]
         let mgr = SocketManager(socketURL: url, config: config)
         let sock = mgr.defaultSocket
@@ -35,12 +36,13 @@ final class SocketManagerService {
                 dict = nil
             }
             guard let dict else { return }
+            let message = MatchedMessage(json: dict)
             DispatchQueue.main.async {
-                self.onMessage?(MatchedMessage(json: dict))
+                self.onMessage?(message)
             }
         }
 
-        sock.connect()
+        sock.connect(withPayload: ["token": token])
         manager = mgr
         socket = sock
     }

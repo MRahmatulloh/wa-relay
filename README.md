@@ -73,12 +73,6 @@ Simulator `.app` artifacts do **not** install on a physical iPhone.
 2. Settings → backend host (`http://127.0.0.1:3000` Simulator, or PC LAN IP for a device)
 3. Login with an existing backend user
 
-### iOS push (FCM + APNs)
+### iOS push note
 
-Same Firebase project as Android; backend Admin SDK already sends both `android` and `apns` payloads.
-
-1. Apple Developer: enable Push Notifications on the App ID; create an APNs Auth Key (`.p8`)
-2. Firebase Console → add iOS app (bundle id `com.warelay.app`) → upload the APNs key → download `GoogleService-Info.plist` into `ios/WaRelay/`
-3. Xcode: ensure Push Notifications + Background Modes → Remote notifications capabilities
-4. Set `FCM_*` in backend `.env` and rebuild backend
-5. Without `GoogleService-Info.plist`, the app still runs but registers a `local-…` token (push skipped by backend)
+Backend already sends FCM `android` + `apns` payloads. The iOS app currently registers a `local-…` token (skipped by backend) so cloud CI can build without the Firebase iOS SDK. Live inbox updates still work over Socket.io. Remote iOS push can be re-enabled later by adding Firebase Messaging SPM + `GoogleService-Info.plist`.

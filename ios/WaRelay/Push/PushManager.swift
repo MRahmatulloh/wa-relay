@@ -1,36 +1,22 @@
 import Foundation
 import UIKit
 import UserNotifications
-#if canImport(FirebaseCore)
-import FirebaseCore
-#endif
-#if canImport(FirebaseMessaging)
-import FirebaseMessaging
-#endif
 
+/// Local notifications + device token registration.
+/// Remote FCM/APNs via Firebase SPM is deferred (heavy CI fails on nanopb); backend skips `local-…` tokens.
 @MainActor
 final class PushManager: NSObject, ObservableObject {
     static let shared = PushManager()
 
-    private(set) var fcmToken: String?
+    private(set) var pushToken: String?
     var onToken: ((String) -> Void)?
 
     private override init() {
         super.init()
     }
 
-    func configureFirebaseIfNeeded() {
-        #if canImport(FirebaseCore)
-        guard FirebaseApp.app() == nil else { return }
-        guard Bundle.main.path(forResource: "GoogleService-Info", ofType: "plist") != nil else {
-            print("Firebase skipped: GoogleService-Info.plist missing")
-            return
-        }
-        FirebaseApp.configure()
-        #if canImport(FirebaseMessaging)
-        Messaging.messaging().delegate = self
-        #endif
-        #endif
+    func configure() {
+        // Placeholder for future Firebase wiring.
     }
 
     func requestPermissionAndRegister() {
@@ -45,35 +31,18 @@ final class PushManager: NSObject, ObservableObject {
     }
 
     func setAPNsToken(_ deviceToken: Data) {
-        #if canImport(FirebaseMessaging)
-        Messaging.messaging().apnsToken = deviceToken
-        #endif
+        let hex = deviceToken.map { String(format: "%02.2hhx", $0) }.joined()
+        // Not an FCM token — store for diagnostics; registration still uses local fallback until Firebase is added.
+        UserDefaults.standard.set(hex, forKey: "apns_device_token_hex")
         refreshToken()
     }
 
     func refreshToken() {
-        #if canImport(FirebaseMessaging)
-        guard FirebaseApp.app() != nil else {
-            emitLocalFallback()
-            return
-        }
-        Messaging.messaging().token { [weak self] token, error in
-            Task { @MainActor in
-                if let token, error == nil {
-                    self?.fcmToken = token
-                    self?.onToken?(token)
-                } else {
-                    self?.emitLocalFallback()
-                }
-            }
-        }
-        #else
         emitLocalFallback()
-        #endif
     }
 
     func currentTokenOrFallback() -> String {
-        if let fcmToken, !fcmToken.isEmpty { return fcmToken }
+        if let pushToken, !pushToken.isEmpty { return pushToken }
         return localFallbackToken()
     }
 
@@ -93,7 +62,7 @@ final class PushManager: NSObject, ObservableObject {
 
     private func emitLocalFallback() {
         let token = localFallbackToken()
-        fcmToken = token
+        pushToken = token
         onToken?(token)
     }
 
@@ -107,18 +76,6 @@ final class PushManager: NSObject, ObservableObject {
         return token
     }
 }
-
-#if canImport(FirebaseMessaging)
-extension PushManager: MessagingDelegate {
-    nonisolated func messaging(_ messaging: Messaging, didReceiveRegistrationToken fcmToken: String?) {
-        Task { @MainActor in
-            guard let fcmToken else { return }
-            self.fcmToken = fcmToken
-            self.onToken?(fcmToken)
-        }
-    }
-}
-#endif
 
 extension PushManager: UNUserNotificationCenterDelegate {
     nonisolated func userNotificationCenter(

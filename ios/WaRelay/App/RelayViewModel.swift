@@ -63,10 +63,10 @@ final class RelayViewModel: ObservableObject {
         socket.onMessage = { [weak self] msg in
             self?.handleSocketMessage(msg)
         }
-        PushManager.shared.onToken = { [weak self] fcm in
+        PushManager.shared.onToken = { [weak self] pushToken in
             Task { @MainActor in
                 guard let self, let token = self.token else { return }
-                await self.registerDevice(token: token, fcmToken: fcm)
+                await self.registerDevice(token: token, fcmToken: pushToken)
             }
         }
         Task { await bootstrap() }

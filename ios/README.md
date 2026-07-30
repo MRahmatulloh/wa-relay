@@ -39,7 +39,7 @@ open ios/WaRelay.xcodeproj
 
 1. Settings → backend host (`http://127.0.0.1:3000` Simulator, or PC LAN IP)
 2. Login with a backend user
-3. Push: add `GoogleService-Info.plist` from Firebase (see root README)
+3. Live updates use Socket.io; remote FCM push is not wired in this CI-friendly build yet (`local-…` device tokens are skipped by backend)
 
 ## Manual test checklist
 
@@ -48,4 +48,4 @@ open ios/WaRelay.xcodeproj
 - [ ] Filters, search, pagination
 - [ ] Expand marks read; star / done; Open WhatsApp
 - [ ] Live `message:matched` via Socket.io
-- [ ] Background push (with Firebase + APNs configured)
+- [ ] Local notification test in Settings

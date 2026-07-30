@@ -50,12 +50,6 @@ jobs:
             exit 1
           fi
 
-      - name: Resolve packages
-        run: |
-          xcodebuild -resolvePackageDependencies \
-            -project WaRelay.xcodeproj \
-            -scheme WaRelay
-
       - name: Pick Simulator destination
         id: sim
         run: |
@@ -87,6 +81,7 @@ jobs:
       - name: Build for Simulator
         run: |
           set -o pipefail
+          set +e
           xcodebuild \
             -project WaRelay.xcodeproj \
             -scheme WaRelay \
@@ -97,7 +92,15 @@ jobs:
             ONLY_ACTIVE_ARCH=YES \
             CODE_SIGNING_ALLOWED=NO \
             COMPILER_INDEX_STORE_ENABLE=NO \
-            build
+            build 2>&1 | tee build.log
+          STATUS=${PIPESTATUS[0]}
+          set -e
+          if [ "$STATUS" -ne 0 ]; then
+            echo "::group::Swift/compiler errors"
+            grep -E 'error:|fatal error:|BUILD FAILED' build.log | tail -n 80 || true
+            echo "::endgroup::"
+            exit "$STATUS"
+          fi
 
       - name: Package .app
         run: |

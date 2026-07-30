@@ -75,4 +75,4 @@ Simulator `.app` artifacts do **not** install on a physical iPhone.
 
 ### iOS push note
 
-Backend already sends FCM `android` + `apns` payloads. The iOS app currently registers a `local-…` token (skipped by backend) so cloud CI can build without the Firebase iOS SDK. Live inbox updates still work over Socket.io. Remote iOS push can be re-enabled later by adding Firebase Messaging SPM + `GoogleService-Info.plist`.
+Backend already sends FCM `android` + `apns` payloads. The iOS app currently uses REST + 3s polling (no Firebase/Socket.IO SPM, so GitHub Actions can build cleanly) and registers a `local-…` token (skipped by backend). Remote push / Socket.io can be re-added later when signing + Mac tooling are available.

@@ -62,15 +62,15 @@ struct MatchedMessage: Identifiable, Equatable, Sendable {
         senderPhone = Self.nullableString(json["senderPhone"])
         senderName = Self.nullableString(json["senderName"])
         chatId = Self.string(json["chatId"]) ?? ""
-        isGroup = json["isGroup"] as? Bool ?? false
+        isGroup = Self.bool(json["isGroup"])
         waLink = Self.nullableString(json["waLink"])
         matchedPattern = Self.nullableString(json["matchedPattern"])
         folder = Self.nullableString(json["folder"])
         timestamp = Self.nullableString(json["timestamp"])
         createdAt = Self.nullableString(json["createdAt"])
         readAt = Self.nullableString(json["readAt"])
-        starred = json["starred"] as? Bool ?? false
-        done = json["done"] as? Bool ?? false
+        starred = Self.bool(json["starred"])
+        done = Self.bool(json["done"])
     }
 
     func updating(readAt: String? = nil, clearReadAt: Bool = false, starred: Bool? = nil, done: Bool? = nil) -> MatchedMessage {
@@ -103,5 +103,14 @@ struct MatchedMessage: Identifiable, Equatable, Sendable {
 
     private static func nullableString(_ value: Any?) -> String? {
         string(value)
+    }
+
+    private static func bool(_ value: Any?) -> Bool {
+        if let b = value as? Bool { return b }
+        if let n = value as? NSNumber { return n.boolValue }
+        if let s = string(value)?.lowercased() {
+            return s == "true" || s == "1" || s == "yes"
+        }
+        return false
     }
 }

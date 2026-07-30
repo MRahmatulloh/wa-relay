@@ -39,7 +39,7 @@ open ios/WaRelay.xcodeproj
 
 1. Settings → backend host (`http://127.0.0.1:3000` Simulator, or PC LAN IP)
 2. Login with a backend user
-3. Live updates use Socket.io; remote FCM push is not wired in this CI-friendly build yet (`local-…` device tokens are skipped by backend)
+3. Inbox refreshes via 3s polling (no Socket.IO/Firebase SPM — keeps cloud CI stable). Remote FCM push is deferred (`local-…` tokens skipped by backend).
 
 ## Manual test checklist
 

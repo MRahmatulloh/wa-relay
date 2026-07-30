@@ -52,7 +52,7 @@ final class RelayViewModel: ObservableObject {
     @Published var path: [AppRoute] = []
 
     private let api = ApiClient()
-    private let socket = SocketManagerService()
+    private let poller = RealtimePoller()
     private var searchTask: Task<Void, Never>?
 
     enum AppRoute: Hashable {
@@ -60,8 +60,9 @@ final class RelayViewModel: ObservableObject {
     }
 
     init() {
-        socket.onMessage = { [weak self] msg in
-            self?.handleSocketMessage(msg)
+        poller.onTick = { [weak self] in
+            guard let self, let token = self.token, !self.loading, !self.loadingMore else { return }
+            await self.loadMessages(token: token, reset: true, silent: true)
         }
         PushManager.shared.onToken = { [weak self] pushToken in
             Task { @MainActor in
@@ -88,7 +89,7 @@ final class RelayViewModel: ObservableObject {
         info = "Host saved"
         error = nil
         if let token {
-            socket.disconnect()
+            poller.stop()
             Task { await connectAndLoad(token: token) }
         }
     }
@@ -115,7 +116,7 @@ final class RelayViewModel: ObservableObject {
     }
 
     func logout() {
-        socket.disconnect()
+        poller.stop()
         UserPreferences.clearSession()
         token = nil
         username = nil
@@ -201,20 +202,22 @@ final class RelayViewModel: ObservableObject {
     }
 
     private func connectAndLoad(token: String) async {
-        socket.connect(token: token)
         await loadMessages(token: token, reset: true)
         await registerFcm(token: token)
+        poller.start()
     }
 
-    private func loadMessages(token: String, reset: Bool) async {
+    private func loadMessages(token: String, reset: Bool, silent: Bool = false) async {
         if reset {
-            loading = true
+            if !silent {
+                loading = true
+                error = nil
+            }
             loadingMore = false
-            error = nil
         } else {
             guard hasMore, !loadingMore else { return }
             loadingMore = true
-            error = nil
+            if !silent { error = nil }
         }
 
         do {
@@ -241,6 +244,7 @@ final class RelayViewModel: ObservableObject {
             loading = false
             loadingMore = false
         } catch ApiError.unauthorized {
+            poller.stop()
             UserPreferences.clearSession()
             self.token = nil
             loading = false
@@ -249,7 +253,9 @@ final class RelayViewModel: ObservableObject {
         } catch {
             loading = false
             loadingMore = false
-            self.error = error.localizedDescription
+            if !silent {
+                self.error = error.localizedDescription
+            }
         }
     }
 
@@ -305,17 +311,6 @@ final class RelayViewModel: ObservableObject {
                 self.error = error.localizedDescription
                 refresh()
             }
-        }
-    }
-
-    private func handleSocketMessage(_ msg: MatchedMessage) {
-        let existed = messages.contains { $0.messageId == msg.messageId }
-        if !existed && msg.isUnread {
-            folderUnread = Self.bumpUnread(folderUnread, folder: msg.folder, delta: 1)
-        }
-        messages.removeAll { $0.messageId == msg.messageId }
-        if Self.matchesCurrentFilter(msg, folder: folder, filter: filter, search: searchQuery) {
-            messages.insert(msg, at: 0)
         }
     }
 

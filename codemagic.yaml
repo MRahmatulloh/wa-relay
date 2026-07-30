@@ -1,0 +1,55 @@
+# Optional no-Mac builder: https://codemagic.io
+# 1) Push this repo to GitHub
+# 2) Codemagic → Add application → select repo
+# 3) Run "WaRelay iOS (Simulator)" for a zip artifact
+# 4) For a real iPhone IPA: configure Apple Developer signing in Codemagic, then run "WaRelay iOS (IPA)"
+# 5) On Windows: install IPA with Sideloadly (https://sideloadly.io) or use TestFlight
+
+workflows:
+  ios-simulator-workflow:
+    name: WaRelay iOS (Simulator)
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+    environment:
+      xcode: latest
+    scripts:
+      - name: Build iOS Simulator
+        script: |
+          set -e
+          cd ios
+          xcodebuild \
+            -project WaRelay.xcodeproj \
+            -scheme WaRelay \
+            -configuration Debug \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath build/DerivedData \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+          APP_PATH=$(find build/DerivedData/Build/Products -name "WaRelay.app" -type d | head -n 1)
+          mkdir -p dist
+          ditto "$APP_PATH" dist/WaRelay.app
+          (cd dist && zip -r WaRelay-simulator.zip WaRelay.app)
+    artifacts:
+      - ios/dist/WaRelay-simulator.zip
+
+  ios-device-workflow:
+    name: WaRelay iOS (IPA)
+    max_build_duration: 90
+    instance_type: mac_mini_m2
+    environment:
+      xcode: latest
+      ios_signing:
+        distribution_type: ad_hoc
+        bundle_identifier: com.warelay.app
+    scripts:
+      - name: Set up code signing
+        script: xcode-project use-profiles --project ios/WaRelay.xcodeproj
+      - name: Build IPA
+        script: |
+          set -e
+          cd ios
+          xcode-project build-ipa \
+            --project WaRelay.xcodeproj \
+            --scheme WaRelay
+    artifacts:
+      - ios/build/ios/ipa/*.ipa

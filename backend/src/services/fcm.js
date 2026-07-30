@@ -79,6 +79,22 @@ export async function sendMatchedPush(message) {
         priority: 'high',
       },
     },
+    apns: {
+      headers: {
+        'apns-priority': '10',
+      },
+      payload: {
+        aps: {
+          alert: {
+            title: message.senderName || message.senderPhone || 'WA Relay',
+            body: String(message.text || '').slice(0, 180),
+          },
+          sound: 'default',
+          badge: 1,
+          'content-available': 1,
+        },
+      },
+    },
   });
 
   console.log(

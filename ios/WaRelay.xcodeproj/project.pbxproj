@@ -1,0 +1,420 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		A10000000000000000000001 /* WaRelayApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000001 /* WaRelayApp.swift */; };
+		A10000000000000000000002 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000002 /* RootView.swift */; };
+		A10000000000000000000003 /* RelayViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000003 /* RelayViewModel.swift */; };
+		A10000000000000000000004 /* MatchedMessage.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000004 /* MatchedMessage.swift */; };
+		A10000000000000000000005 /* UserPreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000005 /* UserPreferences.swift */; };
+		A10000000000000000000006 /* ApiClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000006 /* ApiClient.swift */; };
+		A10000000000000000000007 /* SocketManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000007 /* SocketManager.swift */; };
+		A10000000000000000000008 /* AuthView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000008 /* AuthView.swift */; };
+		A10000000000000000000009 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000009 /* SettingsView.swift */; };
+		A1000000000000000000000A /* MessagesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000A /* MessagesView.swift */; };
+		A1000000000000000000000B /* PushManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000B /* PushManager.swift */; };
+		A1000000000000000000000C /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000C /* Assets.xcassets */; };
+		A1000000000000000000000D /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = A30000000000000000000001 /* FirebaseCore */; };
+		A1000000000000000000000E /* FirebaseMessaging in Frameworks */ = {isa = PBXBuildFile; productRef = A30000000000000000000002 /* FirebaseMessaging */; };
+		A1000000000000000000000F /* SocketIO in Frameworks */ = {isa = PBXBuildFile; productRef = A30000000000000000000003 /* SocketIO */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		A20000000000000000000001 /* WaRelayApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WaRelayApp.swift; sourceTree = "<group>"; };
+		A20000000000000000000002 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
+		A20000000000000000000003 /* RelayViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RelayViewModel.swift; sourceTree = "<group>"; };
+		A20000000000000000000004 /* MatchedMessage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MatchedMessage.swift; sourceTree = "<group>"; };
+		A20000000000000000000005 /* UserPreferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserPreferences.swift; sourceTree = "<group>"; };
+		A20000000000000000000006 /* ApiClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApiClient.swift; sourceTree = "<group>"; };
+		A20000000000000000000007 /* SocketManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SocketManager.swift; sourceTree = "<group>"; };
+		A20000000000000000000008 /* AuthView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthView.swift; sourceTree = "<group>"; };
+		A20000000000000000000009 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		A2000000000000000000000A /* MessagesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessagesView.swift; sourceTree = "<group>"; };
+		A2000000000000000000000B /* PushManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PushManager.swift; sourceTree = "<group>"; };
+		A2000000000000000000000C /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		A2000000000000000000000D /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		A2000000000000000000000E /* WaRelay.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = WaRelay.entitlements; sourceTree = "<group>"; };
+		A2000000000000000000000F /* WaRelay.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = WaRelay.app; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		A40000000000000000000001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A1000000000000000000000D /* FirebaseCore in Frameworks */,
+				A1000000000000000000000E /* FirebaseMessaging in Frameworks */,
+				A1000000000000000000000F /* SocketIO in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		A50000000000000000000001 = {
+			isa = PBXGroup;
+			children = (
+				A50000000000000000000002 /* WaRelay */,
+				A50000000000000000000003 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		A50000000000000000000002 /* WaRelay */ = {
+			isa = PBXGroup;
+			children = (
+				A50000000000000000000004 /* App */,
+				A50000000000000000000005 /* Data */,
+				A50000000000000000000006 /* Features */,
+				A50000000000000000000007 /* Push */,
+				A2000000000000000000000C /* Assets.xcassets */,
+				A2000000000000000000000D /* Info.plist */,
+				A2000000000000000000000E /* WaRelay.entitlements */,
+			);
+			path = WaRelay;
+			sourceTree = "<group>";
+		};
+		A50000000000000000000003 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				A2000000000000000000000F /* WaRelay.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		A50000000000000000000004 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000001 /* WaRelayApp.swift */,
+				A20000000000000000000002 /* RootView.swift */,
+				A20000000000000000000003 /* RelayViewModel.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		A50000000000000000000005 /* Data */ = {
+			isa = PBXGroup;
+			children = (
+				A50000000000000000000008 /* Model */,
+				A50000000000000000000009 /* Prefs */,
+				A5000000000000000000000A /* Remote */,
+			);
+			path = Data;
+			sourceTree = "<group>";
+		};
+		A50000000000000000000006 /* Features */ = {
+			isa = PBXGroup;
+			children = (
+				A5000000000000000000000B /* Auth */,
+				A5000000000000000000000C /* Settings */,
+				A5000000000000000000000D /* Messages */,
+			);
+			path = Features;
+			sourceTree = "<group>";
+		};
+		A50000000000000000000007 /* Push */ = {
+			isa = PBXGroup;
+			children = (
+				A2000000000000000000000B /* PushManager.swift */,
+			);
+			path = Push;
+			sourceTree = "<group>";
+		};
+		A50000000000000000000008 /* Model */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000004 /* MatchedMessage.swift */,
+			);
+			path = Model;
+			sourceTree = "<group>";
+		};
+		A50000000000000000000009 /* Prefs */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000005 /* UserPreferences.swift */,
+			);
+			path = Prefs;
+			sourceTree = "<group>";
+		};
+		A5000000000000000000000A /* Remote */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000006 /* ApiClient.swift */,
+				A20000000000000000000007 /* SocketManager.swift */,
+			);
+			path = Remote;
+			sourceTree = "<group>";
+		};
+		A5000000000000000000000B /* Auth */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000008 /* AuthView.swift */,
+			);
+			path = Auth;
+			sourceTree = "<group>";
+		};
+		A5000000000000000000000C /* Settings */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000009 /* SettingsView.swift */,
+			);
+			path = Settings;
+			sourceTree = "<group>";
+		};
+		A5000000000000000000000D /* Messages */ = {
+			isa = PBXGroup;
+			children = (
+				A2000000000000000000000A /* MessagesView.swift */,
+			);
+			path = Messages;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		A60000000000000000000001 /* WaRelay */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A70000000000000000000003 /* Build configuration list for PBXNativeTarget "WaRelay" */;
+			buildPhases = (
+				A40000000000000000000002 /* Sources */,
+				A40000000000000000000001 /* Frameworks */,
+				A40000000000000000000003 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = WaRelay;
+			packageProductDependencies = (
+				A30000000000000000000001 /* FirebaseCore */,
+				A30000000000000000000002 /* FirebaseMessaging */,
+				A30000000000000000000003 /* SocketIO */,
+			);
+			productName = WaRelay;
+			productReference = A2000000000000000000000F /* WaRelay.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		A80000000000000000000001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1500;
+				LastUpgradeCheck = 1500;
+				TargetAttributes = {
+					A60000000000000000000001 = {
+						CreatedOnToolsVersion = 15.0;
+					};
+				};
+			};
+			buildConfigurationList = A70000000000000000000001 /* Build configuration list for PBXProject "WaRelay" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = A50000000000000000000001;
+			packageReferences = (
+				A90000000000000000000001 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
+				A90000000000000000000002 /* XCRemoteSwiftPackageReference "socket.io-client-swift" */,
+			);
+			productRefGroup = A50000000000000000000003 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				A60000000000000000000001 /* WaRelay */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		A40000000000000000000003 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A1000000000000000000000C /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		A40000000000000000000002 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A10000000000000000000001 /* WaRelayApp.swift in Sources */,
+				A10000000000000000000002 /* RootView.swift in Sources */,
+				A10000000000000000000003 /* RelayViewModel.swift in Sources */,
+				A10000000000000000000004 /* MatchedMessage.swift in Sources */,
+				A10000000000000000000005 /* UserPreferences.swift in Sources */,
+				A10000000000000000000006 /* ApiClient.swift in Sources */,
+				A10000000000000000000007 /* SocketManager.swift in Sources */,
+				A10000000000000000000008 /* AuthView.swift in Sources */,
+				A10000000000000000000009 /* SettingsView.swift in Sources */,
+				A1000000000000000000000A /* MessagesView.swift in Sources */,
+				A1000000000000000000000B /* PushManager.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		A70000000000000000000004 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_TESTABILITY = YES;
+				GCC_DYNAMIC_NO_PIC = NO;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		A70000000000000000000005 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		A70000000000000000000006 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = WaRelay/WaRelay.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = WaRelay/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.warelay.app;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		A70000000000000000000007 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = WaRelay/WaRelay.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = WaRelay/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.warelay.app;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		A70000000000000000000001 /* Build configuration list for PBXProject "WaRelay" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A70000000000000000000004 /* Debug */,
+				A70000000000000000000005 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A70000000000000000000003 /* Build configuration list for PBXNativeTarget "WaRelay" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A70000000000000000000006 /* Debug */,
+				A70000000000000000000007 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		A90000000000000000000001 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/firebase/firebase-ios-sdk";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 11.0.0;
+			};
+		};
+		A90000000000000000000002 /* XCRemoteSwiftPackageReference "socket.io-client-swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/socketio/socket.io-client-swift";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 16.1.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		A30000000000000000000001 /* FirebaseCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A90000000000000000000001 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseCore;
+		};
+		A30000000000000000000002 /* FirebaseMessaging */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A90000000000000000000001 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseMessaging;
+		};
+		A30000000000000000000003 /* SocketIO */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A90000000000000000000002 /* XCRemoteSwiftPackageReference "socket.io-client-swift" */;
+			productName = SocketIO;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = A80000000000000000000001 /* Project object */;
+}

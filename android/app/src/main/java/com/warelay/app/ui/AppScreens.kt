@@ -1,21 +1,27 @@
 package com.warelay.app.ui
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -29,6 +35,7 @@ import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
@@ -40,17 +47,16 @@ import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material3.Badge
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.MenuAnchorType
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -72,10 +78,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -397,22 +406,7 @@ fun MessagesScreen(
     }
 
     Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Inbox") },
-                actions = {
-                    IconButton(onClick = onRefresh) {
-                        Icon(Icons.Default.Refresh, contentDescription = "Refresh")
-                    }
-                    IconButton(onClick = onOpenSettings) {
-                        Icon(Icons.Default.Settings, contentDescription = "Settings")
-                    }
-                    IconButton(onClick = onLogout) {
-                        Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = "Logout")
-                    }
-                },
-            )
-        },
+        contentWindowInsets = WindowInsets.statusBars,
     ) { padding ->
         Box(
             Modifier
@@ -420,95 +414,203 @@ fun MessagesScreen(
                 .fillMaxSize(),
         ) {
             Column(Modifier.fillMaxSize()) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState())
-                        .padding(horizontal = 16.dp, vertical = 4.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                Surface(
+                    tonalElevation = 1.dp,
+                    shadowElevation = 0.dp,
                 ) {
-                    InboxFolder.entries.forEach { folder ->
-                        val unread = state.folderUnread[folder.apiValue] ?: 0
-                        FilterChip(
-                            selected = state.folder == folder,
-                            onClick = { onFolderChange(folder) },
-                            label = {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text(folderLabel(folder))
-                                    if (unread > 0) {
-                                        Spacer(Modifier.width(6.dp))
-                                        Badge {
-                                            Text(if (unread > 99) "99+" else unread.toString())
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 44.dp)
+                            .padding(start = 6.dp, end = 2.dp, top = 2.dp, bottom = 2.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        if (searchExpanded) {
+                            val searchBorder = MaterialTheme.colorScheme.outline.copy(alpha = 0.7f)
+                            val searchText = MaterialTheme.colorScheme.onSurface
+                            BasicTextField(
+                                value = state.searchQuery,
+                                onValueChange = onSearchChange,
+                                singleLine = true,
+                                textStyle = TextStyle(
+                                    color = searchText,
+                                    fontSize = 14.sp,
+                                    lineHeight = 18.sp,
+                                ),
+                                cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(36.dp)
+                                    .padding(end = 4.dp),
+                                decorationBox = { inner ->
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .border(1.dp, searchBorder, RoundedCornerShape(8.dp))
+                                            .background(
+                                                MaterialTheme.colorScheme.surface,
+                                                RoundedCornerShape(8.dp),
+                                            )
+                                            .padding(start = 10.dp, end = 2.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                    ) {
+                                        Box(
+                                            modifier = Modifier.weight(1f),
+                                            contentAlignment = Alignment.CenterStart,
+                                        ) {
+                                            if (state.searchQuery.isEmpty()) {
+                                                Text(
+                                                    "Search…",
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    fontSize = 14.sp,
+                                                    maxLines = 1,
+                                                )
+                                            }
+                                            inner()
+                                        }
+                                        IconButton(
+                                            onClick = {
+                                                searchExpanded = false
+                                                if (state.searchQuery.isNotEmpty()) onSearchChange("")
+                                            },
+                                            modifier = Modifier.size(32.dp),
+                                        ) {
+                                            Icon(
+                                                Icons.Default.Close,
+                                                contentDescription = "Close search",
+                                                modifier = Modifier.size(18.dp),
+                                            )
                                         }
                                     }
+                                },
+                            )
+                        } else {
+                            Row(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .horizontalScroll(rememberScrollState()),
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                InboxFolder.entries.forEach { folder ->
+                                    val unread = state.folderUnread[folder.apiValue] ?: 0
+                                    FilterChip(
+                                        selected = state.folder == folder,
+                                        onClick = { onFolderChange(folder) },
+                                        modifier = Modifier.height(32.dp),
+                                        label = {
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Text(
+                                                    folderLabel(folder),
+                                                    fontSize = 12.sp,
+                                                    maxLines = 1,
+                                                )
+                                                if (unread > 0) {
+                                                    Spacer(Modifier.width(4.dp))
+                                                    Badge {
+                                                        Text(
+                                                            if (unread > 99) "99+" else unread.toString(),
+                                                            fontSize = 10.sp,
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                        },
+                                    )
                                 }
-                            },
-                        )
-                    }
-                }
-
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    ExposedDropdownMenuBox(
-                        expanded = filterMenuExpanded,
-                        onExpandedChange = { filterMenuExpanded = it },
-                        modifier = Modifier.weight(1f),
-                    ) {
-                        OutlinedTextField(
-                            value = filterLabel(state.filter),
-                            onValueChange = {},
-                            readOnly = true,
-                            singleLine = true,
-                            label = { Text("Filter") },
-                            trailingIcon = {
-                                ExposedDropdownMenuDefaults.TrailingIcon(expanded = filterMenuExpanded)
-                            },
-                            modifier = Modifier
-                                .menuAnchor(MenuAnchorType.PrimaryNotEditable)
-                                .fillMaxWidth(),
-                        )
-                        ExposedDropdownMenu(
-                            expanded = filterMenuExpanded,
-                            onDismissRequest = { filterMenuExpanded = false },
-                        ) {
-                            InboxFilter.entries.forEach { filter ->
-                                DropdownMenuItem(
-                                    text = { Text(filterLabel(filter)) },
-                                    onClick = {
-                                        onFilterChange(filter)
-                                        filterMenuExpanded = false
-                                    },
-                                )
                             }
                         }
-                    }
 
-                    if (searchExpanded) {
-                        OutlinedTextField(
-                            value = state.searchQuery,
-                            onValueChange = onSearchChange,
-                            modifier = Modifier.weight(1.4f),
-                            singleLine = true,
-                            placeholder = { Text("Search…") },
-                            trailingIcon = {
-                                IconButton(
-                                    onClick = {
-                                        searchExpanded = false
-                                        if (state.searchQuery.isNotEmpty()) onSearchChange("")
-                                    },
-                                ) {
-                                    Icon(Icons.Default.Close, contentDescription = "Close search")
+                        Box {
+                            IconButton(
+                                onClick = { filterMenuExpanded = true },
+                                modifier = Modifier.size(40.dp),
+                            ) {
+                                Icon(
+                                    Icons.Default.FilterList,
+                                    contentDescription = "Filter",
+                                    modifier = Modifier.size(20.dp),
+                                )
+                            }
+                            if (state.filter != InboxFilter.ALL) {
+                                Box(
+                                    modifier = Modifier
+                                        .align(Alignment.TopEnd)
+                                        .padding(top = 8.dp, end = 8.dp)
+                                        .size(7.dp)
+                                        .clip(CircleShape)
+                                        .background(MaterialTheme.colorScheme.primary),
+                                )
+                            }
+                            DropdownMenu(
+                                expanded = filterMenuExpanded,
+                                onDismissRequest = { filterMenuExpanded = false },
+                            ) {
+                                InboxFilter.entries.forEach { filter ->
+                                    DropdownMenuItem(
+                                        text = { Text(filterLabel(filter)) },
+                                        onClick = {
+                                            onFilterChange(filter)
+                                            filterMenuExpanded = false
+                                        },
+                                        trailingIcon = if (state.filter == filter) {
+                                            {
+                                                Icon(
+                                                    Icons.Default.CheckCircle,
+                                                    contentDescription = null,
+                                                    modifier = Modifier.size(16.dp),
+                                                )
+                                            }
+                                        } else {
+                                            null
+                                        },
+                                    )
+                                }
+                            }
+                        }
+
+                        IconButton(
+                            onClick = {
+                                if (searchExpanded) {
+                                    searchExpanded = false
+                                    if (state.searchQuery.isNotEmpty()) onSearchChange("")
+                                } else {
+                                    searchExpanded = true
                                 }
                             },
-                        )
-                    } else {
-                        IconButton(onClick = { searchExpanded = true }) {
-                            Icon(Icons.Default.Search, contentDescription = "Search")
+                            modifier = Modifier.size(40.dp),
+                        ) {
+                            Icon(
+                                Icons.Default.Search,
+                                contentDescription = "Search",
+                                modifier = Modifier.size(20.dp),
+                                tint = if (searchExpanded || state.searchQuery.isNotEmpty()) {
+                                    MaterialTheme.colorScheme.primary
+                                } else {
+                                    LocalContentColor.current
+                                },
+                            )
+                        }
+                        IconButton(onClick = onRefresh, modifier = Modifier.size(40.dp)) {
+                            Icon(
+                                Icons.Default.Refresh,
+                                contentDescription = "Refresh",
+                                modifier = Modifier.size(20.dp),
+                            )
+                        }
+                        IconButton(onClick = onOpenSettings, modifier = Modifier.size(40.dp)) {
+                            Icon(
+                                Icons.Default.Settings,
+                                contentDescription = "Settings",
+                                modifier = Modifier.size(20.dp),
+                            )
+                        }
+                        IconButton(onClick = onLogout, modifier = Modifier.size(40.dp)) {
+                            Icon(
+                                Icons.AutoMirrored.Filled.Logout,
+                                contentDescription = "Logout",
+                                modifier = Modifier.size(20.dp),
+                            )
                         }
                     }
                 }
@@ -595,7 +697,8 @@ private fun MessageRow(
     onToggleDone: () -> Unit,
     onOpenWhatsApp: () -> Unit,
 ) {
-    val sender = msg.senderName ?: msg.senderPhone ?: "Unknown"
+    val sender = displaySender(msg)
+    val canOpenWhatsApp = isValidWaLink(msg.waLink)
     Surface(
         color = if (msg.isUnread) {
             MaterialTheme.colorScheme.primary.copy(alpha = 0.06f)
@@ -607,7 +710,7 @@ private fun MessageRow(
         Column(
             Modifier
                 .clickable(onClick = onToggleExpanded)
-                .padding(horizontal = 16.dp, vertical = 12.dp),
+                .padding(horizontal = 16.dp, vertical = 10.dp),
         ) {
             Row(verticalAlignment = Alignment.Top) {
                 Box(
@@ -621,14 +724,35 @@ private fun MessageRow(
                         ),
                 )
                 Column(modifier = Modifier.weight(1f)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
                         Text(
                             text = sender,
                             fontWeight = if (msg.isUnread) FontWeight.Bold else FontWeight.SemiBold,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier.weight(1f, fill = false),
                         )
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = Color.Transparent,
+                            border = BorderStroke(
+                                1.dp,
+                                MaterialTheme.colorScheme.outline.copy(alpha = 0.55f),
+                            ),
+                        ) {
+                            Text(
+                                text = "In: ${formatTime(msg.createdAt)} · Read: ${formatTime(msg.readAt)}",
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                fontSize = 10.sp,
+                            )
+                        }
                         if (msg.isGroup) {
                             Icon(
                                 Icons.Default.Groups,
@@ -636,7 +760,6 @@ private fun MessageRow(
                                 modifier = Modifier.size(18.dp),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
-                            Spacer(Modifier.width(4.dp))
                         }
                         if (msg.starred) {
                             Icon(
@@ -662,19 +785,6 @@ private fun MessageRow(
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurface,
                     )
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        text = "In: ${formatTime(msg.createdAt)}  ·  Read: ${formatTime(msg.readAt)}",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    if (!msg.matchedPattern.isNullOrBlank()) {
-                        Text(
-                            text = "Pattern: ${msg.matchedPattern}",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.primary,
-                        )
-                    }
                 }
             }
 
@@ -703,7 +813,7 @@ private fun MessageRow(
                     }
                     IconButton(
                         onClick = onOpenWhatsApp,
-                        enabled = !msg.waLink.isNullOrBlank(),
+                        enabled = canOpenWhatsApp,
                     ) {
                         Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = "Open WhatsApp")
                     }
@@ -711,6 +821,17 @@ private fun MessageRow(
             }
         }
     }
+}
+
+private fun displaySender(msg: MatchedMessage): String {
+    val name = msg.senderName?.trim()?.takeUnless { it.isEmpty() || it == "null" }
+    val phone = msg.senderPhone?.trim()?.takeUnless { it.isEmpty() || it == "null" }
+    return name ?: phone ?: "Unknown"
+}
+
+private fun isValidWaLink(link: String?): Boolean {
+    val url = link?.trim().orEmpty()
+    return url.startsWith("https://wa.me/") && url.length > "https://wa.me/".length
 }
 
 private fun filterLabel(filter: InboxFilter): String = when (filter) {

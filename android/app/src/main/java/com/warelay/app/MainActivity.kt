@@ -7,9 +7,11 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import android.graphics.Color as AndroidColor
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.core.content.ContextCompat
@@ -27,7 +29,17 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
+        // Light app chrome → dark status/nav icons (default edge-to-edge uses light icons).
+        enableEdgeToEdge(
+            statusBarStyle = SystemBarStyle.light(
+                scrim = AndroidColor.TRANSPARENT,
+                darkScrim = AndroidColor.TRANSPARENT,
+            ),
+            navigationBarStyle = SystemBarStyle.light(
+                scrim = AndroidColor.TRANSPARENT,
+                darkScrim = AndroidColor.TRANSPARENT,
+            ),
+        )
         requestNotifPermission()
 
         val app = application as WaRelayApp
@@ -44,9 +56,7 @@ class MainActivity : ComponentActivity() {
                     onLoadMore = vm::loadMore,
                     onClearFlash = vm::clearMessages,
                     onOpenWhatsApp = { link ->
-                        if (!link.isNullOrBlank()) {
-                            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(link)))
-                        }
+                        openWhatsAppLink(link)
                     },
                     onSearchChange = vm::setSearchQuery,
                     onFilterChange = vm::setFilter,
@@ -65,6 +75,16 @@ class MainActivity : ComponentActivity() {
                     },
                 )
             }
+        }
+    }
+
+    private fun openWhatsAppLink(link: String?) {
+        val url = link?.trim().orEmpty()
+        if (url.isEmpty() || url == "null" || !url.startsWith("https://wa.me/")) return
+        try {
+            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+        } catch (_: Exception) {
+            // No WhatsApp / browser handler — avoid crashing.
         }
     }
 

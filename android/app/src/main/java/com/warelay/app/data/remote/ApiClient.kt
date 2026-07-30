@@ -187,13 +187,13 @@ class ApiClient(private val preferences: UserPreferences) {
                 id = obj.optString("id"),
                 messageId = obj.optString("messageId"),
                 text = obj.optString("text"),
-                senderPhone = obj.optString("senderPhone").ifBlank { null },
-                senderName = obj.optString("senderName").ifBlank { null },
+                senderPhone = optNullableString(obj, "senderPhone"),
+                senderName = optNullableString(obj, "senderName"),
                 chatId = obj.optString("chatId"),
                 isGroup = obj.optBoolean("isGroup"),
-                waLink = obj.optString("waLink").ifBlank { null },
-                matchedPattern = obj.optString("matchedPattern").ifBlank { null },
-                folder = obj.optString("folder").ifBlank { null },
+                waLink = optNullableString(obj, "waLink"),
+                matchedPattern = optNullableString(obj, "matchedPattern"),
+                folder = optNullableString(obj, "folder"),
                 timestamp = optNullableString(obj, "timestamp"),
                 createdAt = optNullableString(obj, "createdAt"),
                 readAt = optNullableString(obj, "readAt"),
@@ -201,9 +201,14 @@ class ApiClient(private val preferences: UserPreferences) {
                 done = obj.optBoolean("done", false),
             )
 
+        /**
+         * JSONObject.optString returns the literal "null" for JSON null — treat that as absent.
+         */
         private fun optNullableString(obj: JSONObject, key: String): String? {
             if (!obj.has(key) || obj.isNull(key)) return null
-            return obj.optString(key).ifBlank { null }
+            val value = obj.optString(key).trim()
+            if (value.isEmpty() || value == "null" || value == "undefined") return null
+            return value
         }
     }
 }

@@ -1,6 +1,6 @@
 # wa-relay
 
-WhatsApp (Baileys) → Node backend (MongoDB, Docker) → Android APK (FCM + Socket.io).
+WhatsApp (Baileys) → Node backend (MongoDB, Docker) → Android APK / iOS app (FCM + Socket.io).
 
 **Warning:** Baileys is unofficial and may violate WhatsApp ToS. Do not use your primary phone number.
 
@@ -36,7 +36,7 @@ That account also works for QR Basic Auth at `/qr`.
 ### Protected (Bearer JWT)
 
 - `GET /messages?limit=40&before=<messageId>` — cursor page (`hasMore`, `nextCursor`)
-- `POST /devices/register` `{ "fcmToken", "platform": "android" }`
+- `POST /devices/register` `{ "fcmToken", "platform": "android" | "ios" }`
 - `POST /test/inject` `{ "text", "senderPhone?" }` — simulate a matched message (dev/test)
 - Socket.io: connect with `auth: { token }`, event `message:matched`
 
@@ -50,3 +50,35 @@ Open `android/` in Android Studio (Gradle wrapper included).
 4. **Open in WhatsApp** uses `waLink` (`https://wa.me/<phone>`)
 
 For real FCM: add `android/app/google-services.json` and set `FCM_*` in `.env`, then rebuild backend.
+
+## iOS
+
+Source: `ios/WaRelay.xcodeproj` (SwiftUI, iOS 16+).
+
+### No Mac? Cloud build
+
+Native iOS **cannot** be compiled on Windows. Use a cloud Mac runner:
+
+1. Push this repo to GitHub (remote is required)
+2. Actions → **iOS Build** runs on `macos-14` and uploads `WaRelay-ios-simulator` zip
+3. Optional: [Codemagic](https://codemagic.io) with [`codemagic.yaml`](codemagic.yaml)
+
+**Real iPhone install (Windows):** cloud must produce a **signed `.ipa`**, then install with [Sideloadly](https://sideloadly.io) (or TestFlight). That needs an Apple Developer account + signing secrets — see [`ios/README.md`](ios/README.md).
+
+Simulator `.app` artifacts do **not** install on a physical iPhone.
+
+### With a Mac
+
+1. Open `ios/WaRelay.xcodeproj` in Xcode
+2. Settings → backend host (`http://127.0.0.1:3000` Simulator, or PC LAN IP for a device)
+3. Login with an existing backend user
+
+### iOS push (FCM + APNs)
+
+Same Firebase project as Android; backend Admin SDK already sends both `android` and `apns` payloads.
+
+1. Apple Developer: enable Push Notifications on the App ID; create an APNs Auth Key (`.p8`)
+2. Firebase Console → add iOS app (bundle id `com.warelay.app`) → upload the APNs key → download `GoogleService-Info.plist` into `ios/WaRelay/`
+3. Xcode: ensure Push Notifications + Background Modes → Remote notifications capabilities
+4. Set `FCM_*` in backend `.env` and rebuild backend
+5. Without `GoogleService-Info.plist`, the app still runs but registers a `local-…` token (push skipped by backend)

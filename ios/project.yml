@@ -1,0 +1,52 @@
+name: WaRelay
+options:
+  bundleIdPrefix: com.warelay
+  deploymentTarget:
+    iOS: "16.0"
+  xcodeVersion: "15.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+    TARGETED_DEVICE_FAMILY: "1,2"
+    CURRENT_PROJECT_VERSION: "1"
+    MARKETING_VERSION: "1.0.0"
+packages:
+  Firebase:
+    url: https://github.com/firebase/firebase-ios-sdk
+    from: "11.0.0"
+  SocketIO:
+    url: https://github.com/socketio/socket.io-client-swift
+    from: "16.1.0"
+targets:
+  WaRelay:
+    type: application
+    platform: iOS
+    sources:
+      - path: WaRelay
+        excludes:
+          - "GoogleService-Info.plist.example"
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.warelay.app
+        INFOPLIST_FILE: WaRelay/Info.plist
+        CODE_SIGN_ENTITLEMENTS: WaRelay/WaRelay.entitlements
+        GENERATE_INFOPLIST_FILE: false
+        DEVELOPMENT_TEAM: ""
+    dependencies:
+      - package: Firebase
+        product: FirebaseCore
+      - package: Firebase
+        product: FirebaseMessaging
+      - package: SocketIO
+        product: SocketIO
+    info:
+      path: WaRelay/Info.plist
+      properties:
+        CFBundleDisplayName: WA Relay
+        UILaunchScreen: {}
+        UIBackgroundModes:
+          - remote-notification
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+          NSAllowsArbitraryLoads: true

@@ -1,0 +1,7 @@
+# Local Firebase config (download from Firebase Console)
+WaRelay/GoogleService-Info.plist
+
+# Xcode user data
+xcuserdata/
+*.xcuserstate
+DerivedData/

@@ -39,44 +39,63 @@ jobs:
           xcodebuild -runFirstLaunch || true
           echo "Installed SDKs:"
           xcodebuild -showsdks || true
-          # simctl UDIDs can exist while this Xcode still lacks a usable Simulator destination.
-          if ! xcodebuild -project WaRelay.xcodeproj -scheme WaRelay -showdestinations 2>&1 | grep -q 'platform:iOS Simulator'; then
-            echo "No simulator destinations for selected Xcode — downloading iOS platform (can take several minutes)…"
+
+          # Placeholder "Any iOS Simulator Device" must NOT count as a real destination.
+          real_sim_line() {
+            xcodebuild -project WaRelay.xcodeproj -scheme WaRelay -showdestinations 2>&1 \
+              | grep 'platform:iOS Simulator' \
+              | grep 'name:iPhone' \
+              | grep -E 'id:[0-9A-Fa-f-]{36}' \
+              | grep -vi 'placeholder' \
+              | grep -vi 'Any iOS Simulator' \
+              | head -n 1 || true
+          }
+
+          LINE=$(real_sim_line)
+          if [ -z "$LINE" ]; then
+            echo "No real iPhone Simulator — downloading iOS platform (several minutes)…"
             xcodebuild -downloadPlatform iOS
+            LINE=$(real_sim_line)
           fi
-          if ! xcodebuild -project WaRelay.xcodeproj -scheme WaRelay -showdestinations 2>&1 | grep -q 'platform:iOS Simulator'; then
-            echo "::error::Still no iOS Simulator destinations after platform download"
+
+          if [ -z "$LINE" ]; then
+            echo "::error::Still no real iPhone Simulator after platform download"
             xcodebuild -project WaRelay.xcodeproj -scheme WaRelay -showdestinations || true
+            xcrun simctl list devices available || true
             exit 1
           fi
+          echo "Real simulator available: $LINE"
 
       - name: Pick Simulator destination
         id: sim
         run: |
           set -e
-          # Only use destinations this Xcode accepts (never raw simctl UDIDs).
           SHOW=$(xcodebuild -project WaRelay.xcodeproj -scheme WaRelay -showdestinations 2>&1 || true)
           echo "$SHOW"
-          DEST=$(echo "$SHOW" | grep 'platform:iOS Simulator' | grep 'name:iPhone' | head -n 1 || true)
+          DEST=$(echo "$SHOW" \
+            | grep 'platform:iOS Simulator' \
+            | grep 'name:iPhone' \
+            | grep -E 'id:[0-9A-Fa-f-]{36}' \
+            | grep -vi 'placeholder' \
+            | grep -vi 'Any iOS Simulator' \
+            | head -n 1 || true)
           if [ -z "$DEST" ]; then
-            DEST=$(echo "$SHOW" | grep 'platform:iOS Simulator' | head -n 1 || true)
-          fi
-          if [ -z "$DEST" ]; then
-            echo "::error::No iOS Simulator destination available for this Xcode"
+            echo "::error::No real iPhone Simulator destination (refusing placeholder)"
             exit 1
           fi
+          UDID=$(echo "$DEST" | sed -n 's/.*id:\([0-9A-Fa-f-]\{36\}\).*/\1/p')
           NAME=$(echo "$DEST" | sed -n 's/.*name:\([^,}]*\).*/\1/p' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
           OS=$(echo "$DEST" | sed -n 's/.*OS:\([^,}]*\).*/\1/p' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
-          if [ -n "$NAME" ] && [ -n "$OS" ]; then
+          if [ -n "$UDID" ]; then
+            SPEC="platform=iOS Simulator,id=$UDID"
+          elif [ -n "$NAME" ] && [ -n "$OS" ] && [ "$OS" != "latest" ]; then
             SPEC="platform=iOS Simulator,name=$NAME,OS=$OS"
-          elif [ -n "$NAME" ]; then
-            SPEC="platform=iOS Simulator,name=$NAME"
           else
-            echo "::error::Could not parse simulator name from: $DEST"
+            echo "::error::Could not parse real simulator from: $DEST"
             exit 1
           fi
           echo "destination=$SPEC" >> "$GITHUB_OUTPUT"
-          echo "Using destination: $SPEC"
+          echo "Using destination: $SPEC ($NAME / $OS)"
 
       - name: Build for Simulator
         run: |

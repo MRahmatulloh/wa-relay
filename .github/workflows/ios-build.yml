@@ -33,6 +33,23 @@ jobs:
         with:
           xcode-version: "16.2"
 
+      - name: Ensure iOS Simulator runtime
+        run: |
+          set -e
+          xcodebuild -runFirstLaunch || true
+          echo "Installed SDKs:"
+          xcodebuild -showsdks || true
+          # simctl UDIDs can exist while this Xcode still lacks a usable Simulator destination.
+          if ! xcodebuild -project WaRelay.xcodeproj -scheme WaRelay -showdestinations 2>&1 | grep -q 'platform:iOS Simulator'; then
+            echo "No simulator destinations for selected Xcode — downloading iOS platform (can take several minutes)…"
+            xcodebuild -downloadPlatform iOS
+          fi
+          if ! xcodebuild -project WaRelay.xcodeproj -scheme WaRelay -showdestinations 2>&1 | grep -q 'platform:iOS Simulator'; then
+            echo "::error::Still no iOS Simulator destinations after platform download"
+            xcodebuild -project WaRelay.xcodeproj -scheme WaRelay -showdestinations || true
+            exit 1
+          fi
+
       - name: Resolve packages
         run: |
           xcodebuild -resolvePackageDependencies \
@@ -42,20 +59,30 @@ jobs:
       - name: Pick Simulator destination
         id: sim
         run: |
-          # Prefer a concrete iPhone simulator (avoids dual-arch generic destination races)
-          LINE=$(xcrun simctl list devices available | grep -E 'iPhone (16|15|14)' | head -n 1 || true)
-          if [ -z "$LINE" ]; then
-            LINE=$(xcrun simctl list devices available | grep 'iPhone' | head -n 1 || true)
+          set -e
+          # Only use destinations this Xcode accepts (never raw simctl UDIDs).
+          SHOW=$(xcodebuild -project WaRelay.xcodeproj -scheme WaRelay -showdestinations 2>&1 || true)
+          echo "$SHOW"
+          DEST=$(echo "$SHOW" | grep 'platform:iOS Simulator' | grep 'name:iPhone' | head -n 1 || true)
+          if [ -z "$DEST" ]; then
+            DEST=$(echo "$SHOW" | grep 'platform:iOS Simulator' | head -n 1 || true)
           fi
-          echo "Simulator line: $LINE"
-          UDID=$(echo "$LINE" | grep -oE '[0-9A-Fa-f-]{36}' | head -n 1)
-          if [ -z "$UDID" ]; then
-            echo "::error::No iPhone simulator found"
-            xcrun simctl list devices available
+          if [ -z "$DEST" ]; then
+            echo "::error::No iOS Simulator destination available for this Xcode"
             exit 1
           fi
-          echo "udid=$UDID" >> "$GITHUB_OUTPUT"
-          echo "Using simulator: $UDID"
+          NAME=$(echo "$DEST" | sed -n 's/.*name:\([^,}]*\).*/\1/p' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+          OS=$(echo "$DEST" | sed -n 's/.*OS:\([^,}]*\).*/\1/p' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+          if [ -n "$NAME" ] && [ -n "$OS" ]; then
+            SPEC="platform=iOS Simulator,name=$NAME,OS=$OS"
+          elif [ -n "$NAME" ]; then
+            SPEC="platform=iOS Simulator,name=$NAME"
+          else
+            echo "::error::Could not parse simulator name from: $DEST"
+            exit 1
+          fi
+          echo "destination=$SPEC" >> "$GITHUB_OUTPUT"
+          echo "Using destination: $SPEC"
 
       - name: Build for Simulator
         run: |
@@ -65,7 +92,7 @@ jobs:
             -scheme WaRelay \
             -configuration Debug \
             -sdk iphonesimulator \
-            -destination "platform=iOS Simulator,id=${{ steps.sim.outputs.udid }}" \
+            -destination "${{ steps.sim.outputs.destination }}" \
             -derivedDataPath build/DerivedData \
             ONLY_ACTIVE_ARCH=YES \
             CODE_SIGNING_ALLOWED=NO \

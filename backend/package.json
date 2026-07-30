@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "start": "node src/index.js",
-    "dev": "node --watch src/index.js"
+    "dev": "node --watch src/index.js",
+    "user:create": "node src/cli/create-user.js"
   },
   "dependencies": {
     "@hapi/boom": "^9.1.4",

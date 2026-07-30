@@ -9,7 +9,7 @@ import fs from 'fs';
 import pino from 'pino';
 import QRCode from 'qrcode';
 import { config } from '../config.js';
-import { Message } from '../models/Message.js';
+import { Message, serializeMessage } from '../models/Message.js';
 import { matchPattern } from './patterns.js';
 import { sendMatchedPush } from './fcm.js';
 
@@ -72,8 +72,9 @@ async function handleIncoming(msg) {
   const text = extractText(msg);
   if (!text) return;
 
-  const matchedPattern = matchPattern(text);
-  if (!matchedPattern) return;
+  const match = matchPattern(text);
+  if (!match) return;
+  const { matchedPattern, folder } = match;
 
   const chatId = msg.key.remoteJid;
   const isGroup = chatId?.endsWith('@g.us') || false;
@@ -100,6 +101,7 @@ async function handleIncoming(msg) {
         isGroup,
         waLink,
         matchedPattern,
+        folder,
         timestamp,
       },
       { upsert: true, new: true, setDefaultsOnInsert: true }
@@ -109,19 +111,7 @@ async function handleIncoming(msg) {
     throw err;
   }
 
-  const payload = {
-    id: saved._id.toString(),
-    messageId: saved.messageId,
-    text: saved.text,
-    senderPhone: saved.senderPhone,
-    senderName: saved.senderName,
-    chatId: saved.chatId,
-    isGroup: saved.isGroup,
-    waLink: saved.waLink,
-    matchedPattern: saved.matchedPattern,
-    timestamp: saved.timestamp,
-    createdAt: saved.createdAt,
-  };
+  const payload = serializeMessage(saved);
 
   if (broadcastFn) broadcastFn(payload);
   sendMatchedPush(payload).catch((err) => console.error('FCM send error', err.message));

@@ -1,7 +1,8 @@
 import { Router } from 'express';
-import { Message } from '../models/Message.js';
+import { Message, serializeMessage } from '../models/Message.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { sendMatchedPush } from '../services/fcm.js';
+import { matchPattern } from '../services/patterns.js';
 
 /** Dev/helper: inject a matched message (simulates Baileys pattern hit). */
 export function createTestRoutes(broadcastMatched) {
@@ -9,11 +10,15 @@ export function createTestRoutes(broadcastMatched) {
 
   router.post('/inject', authMiddleware, async (req, res) => {
     try {
-      const text = String(req.body.text || 'urgent test message');
+      const text = String(req.body.text || 'saloon LGW test message');
       const senderPhone = req.body.senderPhone ? String(req.body.senderPhone) : '998901234567';
       const senderName = req.body.senderName ? String(req.body.senderName) : 'Test Sender';
       const messageId = `test-${Date.now()}`;
       const waLink = `https://wa.me/${senderPhone}`;
+      const match = matchPattern(text) || {
+        matchedPattern: 'test-inject',
+        folder: String(req.body.folder || 'others'),
+      };
       const saved = await Message.create({
         messageId,
         text,
@@ -22,22 +27,11 @@ export function createTestRoutes(broadcastMatched) {
         chatId: `${senderPhone}@s.whatsapp.net`,
         isGroup: false,
         waLink,
-        matchedPattern: 'test-inject',
+        matchedPattern: match.matchedPattern,
+        folder: match.folder,
         timestamp: new Date(),
       });
-      const payload = {
-        id: saved._id.toString(),
-        messageId: saved.messageId,
-        text: saved.text,
-        senderPhone: saved.senderPhone,
-        senderName: saved.senderName,
-        chatId: saved.chatId,
-        isGroup: saved.isGroup,
-        waLink: saved.waLink,
-        matchedPattern: saved.matchedPattern,
-        timestamp: saved.timestamp,
-        createdAt: saved.createdAt,
-      };
+      const payload = serializeMessage(saved);
       broadcastMatched(payload);
       sendMatchedPush(payload).catch(() => {});
       return res.status(201).json({ message: payload });

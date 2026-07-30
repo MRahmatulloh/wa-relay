@@ -13,7 +13,7 @@ docker compose up --build
 ```
 
 - API: http://localhost:3000
-- QR login: http://localhost:3000/qr
+- QR login: http://localhost:3000/qr (HTTP Basic Auth — same username/password as app users)
 - Health: http://localhost:3000/health
 
 ### Auth
@@ -21,9 +21,21 @@ docker compose up --build
 - `POST /auth/register` `{ "username", "password" }`
 - `POST /auth/login` `{ "username", "password" }` → `{ token, user }`
 
+Create a user from the console (same rules: username ≥3, password ≥6):
+
+```bash
+# local (from backend/)
+npm run user:create -- admin secret123
+
+# docker
+docker compose exec backend npm run user:create -- admin secret123
+```
+
+That account also works for QR Basic Auth at `/qr`.
+
 ### Protected (Bearer JWT)
 
-- `GET /messages?limit=50`
+- `GET /messages?limit=40&before=<messageId>` — cursor page (`hasMore`, `nextCursor`)
 - `POST /devices/register` `{ "fcmToken", "platform": "android" }`
 - `POST /test/inject` `{ "text", "senderPhone?" }` — simulate a matched message (dev/test)
 - Socket.io: connect with `auth: { token }`, event `message:matched`

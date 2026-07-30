@@ -1,7 +1,10 @@
 import { Router } from 'express';
+import { basicAuthMiddleware } from '../middleware/auth.js';
 import { getConnectionStatus, getQrDataUrl } from '../services/baileys.js';
 
 const router = Router();
+
+router.use(basicAuthMiddleware);
 
 router.get('/', (req, res) => {
   const status = getConnectionStatus();
@@ -12,6 +15,7 @@ router.get('/', (req, res) => {
 <body style="font-family:sans-serif;text-align:center;padding:2rem">
   <h1>WhatsApp connected</h1>
   <p>Session is active. No QR needed.</p>
+  <p style="color:#666;font-size:0.9rem">Signed in as ${escapeHtml(req.user.username)}</p>
 </body></html>`);
   }
   if (!qr) {
@@ -19,7 +23,7 @@ router.get('/', (req, res) => {
 <html><head><meta charset="utf-8"><meta http-equiv="refresh" content="3"><title>WA Relay QR</title></head>
 <body style="font-family:sans-serif;text-align:center;padding:2rem">
   <h1>Waiting for QR…</h1>
-  <p>Status: ${status}. This page refreshes automatically.</p>
+  <p>Status: ${escapeHtml(status)}. This page refreshes automatically.</p>
 </body></html>`);
   }
   return res.type('html').send(`<!doctype html>
@@ -34,5 +38,13 @@ router.get('/', (req, res) => {
 router.get('/status', (req, res) => {
   res.json({ status: getConnectionStatus(), hasQr: Boolean(getQrDataUrl()) });
 });
+
+function escapeHtml(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
 
 export default router;

@@ -4,6 +4,7 @@ import com.warelay.app.data.model.MatchedMessage
 import com.warelay.app.data.prefs.UserPreferences
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -21,6 +22,24 @@ class ApiClient(private val preferences: UserPreferences) {
     private val jsonMedia = "application/json; charset=utf-8".toMediaType()
 
     data class AuthResult(val token: String, val username: String)
+
+    data class MessagesPage(
+        val messages: List<MatchedMessage>,
+        val hasMore: Boolean,
+        val nextCursor: String?,
+    )
+
+    data class MessageQuery(
+        val q: String? = null,
+        val unread: Boolean? = null,
+        val starred: Boolean? = null,
+        val done: Boolean? = null,
+        val isGroup: Boolean? = null,
+        val folder: String? = null,
+        val limit: Int = 40,
+        /** Last message id from previous page (exclusive). */
+        val before: String? = null,
+    )
 
     suspend fun register(username: String, password: String): AuthResult =
         auth("/auth/register", username, password)
@@ -53,18 +72,84 @@ class ApiClient(private val preferences: UserPreferences) {
             }
         }
 
-    suspend fun fetchMessages(token: String): List<MatchedMessage> = withContext(Dispatchers.IO) {
+    suspend fun fetchMessages(token: String, query: MessageQuery = MessageQuery()): MessagesPage =
+        withContext(Dispatchers.IO) {
+            val base = preferences.getHostUrl().trimEnd('/')
+            val urlBuilder = "$base/messages".toHttpUrl().newBuilder()
+                .addQueryParameter("limit", query.limit.toString())
+            if (!query.q.isNullOrBlank()) urlBuilder.addQueryParameter("q", query.q)
+            query.unread?.let { urlBuilder.addQueryParameter("unread", it.toString()) }
+            query.starred?.let { urlBuilder.addQueryParameter("starred", it.toString()) }
+            query.done?.let { urlBuilder.addQueryParameter("done", it.toString()) }
+            query.isGroup?.let { urlBuilder.addQueryParameter("isGroup", it.toString()) }
+            if (!query.folder.isNullOrBlank() && query.folder != "all") {
+                urlBuilder.addQueryParameter("folder", query.folder)
+            }
+            if (!query.before.isNullOrBlank()) {
+                urlBuilder.addQueryParameter("before", query.before)
+            }
+
+            val req = Request.Builder()
+                .url(urlBuilder.build())
+                .header("Authorization", "Bearer $token")
+                .get()
+                .build()
+            client.newCall(req).execute().use { res ->
+                val text = res.body?.string().orEmpty()
+                if (res.code == 401) throw UnauthorizedException()
+                if (!res.isSuccessful) throw ApiException("HTTP ${res.code}")
+                val json = JSONObject(text)
+                val arr = json.getJSONArray("messages")
+                MessagesPage(
+                    messages = parseMessages(arr),
+                    hasMore = json.optBoolean("hasMore", false),
+                    nextCursor = json.optString("nextCursor").ifBlank { null },
+                )
+            }
+        }
+
+    suspend fun fetchUnreadCounts(token: String): Map<String, Int> =
+        withContext(Dispatchers.IO) {
+            val req = Request.Builder()
+                .url(preferences.getHostUrl().trimEnd('/') + "/messages/unread-counts")
+                .header("Authorization", "Bearer $token")
+                .get()
+                .build()
+            client.newCall(req).execute().use { res ->
+                val text = res.body?.string().orEmpty()
+                if (res.code == 401) throw UnauthorizedException()
+                if (!res.isSuccessful) throw ApiException("HTTP ${res.code}")
+                val obj = JSONObject(text).getJSONObject("counts")
+                val keys = listOf("all", "lgw", "lhr", "ltn", "stn", "others")
+                keys.associateWith { obj.optInt(it, 0) }
+            }
+        }
+
+    suspend fun patchMessage(
+        token: String,
+        id: String,
+        read: Boolean? = null,
+        starred: Boolean? = null,
+        done: Boolean? = null,
+    ): MatchedMessage = withContext(Dispatchers.IO) {
+        val bodyJson = JSONObject()
+        if (read != null) bodyJson.put("read", read)
+        if (starred != null) bodyJson.put("starred", starred)
+        if (done != null) bodyJson.put("done", done)
+        val body = bodyJson.toString().toRequestBody(jsonMedia)
         val req = Request.Builder()
-            .url(preferences.getHostUrl() + "/messages?limit=100")
+            .url(preferences.getHostUrl().trimEnd('/') + "/messages/$id")
             .header("Authorization", "Bearer $token")
-            .get()
+            .patch(body)
             .build()
         client.newCall(req).execute().use { res ->
             val text = res.body?.string().orEmpty()
             if (res.code == 401) throw UnauthorizedException()
-            if (!res.isSuccessful) throw ApiException("HTTP ${res.code}")
-            val arr = JSONObject(text).getJSONArray("messages")
-            parseMessages(arr)
+            if (!res.isSuccessful) {
+                val err = runCatching { JSONObject(text).optString("error") }.getOrNull()
+                throw ApiException(err?.ifBlank { null } ?: "HTTP ${res.code}")
+            }
+            parseMessage(JSONObject(text).getJSONObject("message"))
         }
     }
 
@@ -108,8 +193,18 @@ class ApiClient(private val preferences: UserPreferences) {
                 isGroup = obj.optBoolean("isGroup"),
                 waLink = obj.optString("waLink").ifBlank { null },
                 matchedPattern = obj.optString("matchedPattern").ifBlank { null },
-                timestamp = obj.optString("timestamp").ifBlank { null },
+                folder = obj.optString("folder").ifBlank { null },
+                timestamp = optNullableString(obj, "timestamp"),
+                createdAt = optNullableString(obj, "createdAt"),
+                readAt = optNullableString(obj, "readAt"),
+                starred = obj.optBoolean("starred", false),
+                done = obj.optBoolean("done", false),
             )
+
+        private fun optNullableString(obj: JSONObject, key: String): String? {
+            if (!obj.has(key) || obj.isNull(key)) return null
+            return obj.optString(key).ifBlank { null }
+        }
     }
 }
 

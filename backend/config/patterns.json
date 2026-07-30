@@ -1,3 +1,9 @@
-[
-  ".*"
-]
+{
+  "includePattern": "MPV\\d*|8\\s*/\\s*9|9\\s*/\\s*8|8\\s*,\\s*9|9\\s*,\\s*8|[89]\\s*-?\\s*seaters?|[89]seaters?|minivan|minibus|v[\\s-]?class|sharan",
+  "folders": [
+    { "id": "lgw", "name": "LGW", "includePattern": "LGW|Gatwick" },
+    { "id": "lhr", "name": "LHR", "includePattern": "LHR|Heathrow" },
+    { "id": "ltn", "name": "LTN", "includePattern": "LTN|Luton" },
+    { "id": "stn", "name": "STN", "includePattern": "STN|Stansted" }
+  ]
+}

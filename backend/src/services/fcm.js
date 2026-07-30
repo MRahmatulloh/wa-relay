@@ -36,8 +36,15 @@ export function isFcmReady() {
 export async function sendMatchedPush(message) {
   if (!ready) return;
   const devices = await Device.find().lean();
-  const tokens = [...new Set(devices.map((d) => d.fcmToken).filter(Boolean))];
-  if (!tokens.length) return;
+  const tokens = [...new Set(
+    devices
+      .map((d) => d.fcmToken)
+      .filter((t) => t && !String(t).startsWith('local-'))
+  )];
+  if (!tokens.length) {
+    console.warn('FCM skip: no valid device tokens');
+    return;
+  }
 
   const data = {
     messageId: String(message.messageId || ''),
@@ -47,8 +54,12 @@ export async function sendMatchedPush(message) {
     chatId: String(message.chatId || ''),
     waLink: String(message.waLink || ''),
     isGroup: String(!!message.isGroup),
+    matchedPattern: String(message.matchedPattern || ''),
+    folder: String(message.folder || 'others'),
   };
 
+  // notification payload → system tray even if app process is dead (needed on MuMu).
+  // data payload → available when user opens the app / onMessageReceived in foreground.
   const response = await admin.messaging().sendEachForMulticast({
     tokens,
     notification: {
@@ -58,7 +69,28 @@ export async function sendMatchedPush(message) {
     data,
     android: {
       priority: 'high',
+      ttl: 60 * 60 * 1000,
+      notification: {
+        channelId: 'wa_relay_messages',
+        icon: 'ic_notification',
+        sound: 'default',
+        defaultVibrateTimings: true,
+        visibility: 'public',
+        priority: 'high',
+      },
     },
+  });
+
+  console.log(
+    'FCM send:',
+    `success=${response.successCount}`,
+    `failure=${response.failureCount}`,
+    `tokens=${tokens.length}`
+  );
+  response.responses.forEach((r, i) => {
+    if (!r.success) {
+      console.warn('FCM fail', i, r.error?.code, r.error?.message);
+    }
   });
 
   const bad = [];

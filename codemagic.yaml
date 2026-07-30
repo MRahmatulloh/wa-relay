@@ -17,13 +17,17 @@ workflows:
         script: |
           set -e
           cd ios
+          UDID=$(xcrun simctl list devices available | grep -E 'iPhone (16|15|14)' | head -n 1 | grep -oE '[0-9A-Fa-f-]{36}' | head -n 1)
           xcodebuild \
             -project WaRelay.xcodeproj \
             -scheme WaRelay \
             -configuration Debug \
-            -destination 'generic/platform=iOS Simulator' \
+            -sdk iphonesimulator \
+            -destination "platform=iOS Simulator,id=$UDID" \
             -derivedDataPath build/DerivedData \
+            ONLY_ACTIVE_ARCH=YES \
             CODE_SIGNING_ALLOWED=NO \
+            COMPILER_INDEX_STORE_ENABLE=NO \
             build
           APP_PATH=$(find build/DerivedData/Build/Products -name "WaRelay.app" -type d | head -n 1)
           mkdir -p dist

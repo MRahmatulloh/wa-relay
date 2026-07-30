@@ -20,7 +20,7 @@ on:
 jobs:
   build-simulator:
     name: Build (iOS Simulator)
-    runs-on: macos-14
+    runs-on: macos-15
     defaults:
       run:
         working-directory: ios
@@ -31,13 +31,31 @@ jobs:
       - name: Select Xcode
         uses: maxim-lobanov/setup-xcode@v1
         with:
-          xcode-version: "15.4"
+          xcode-version: "16.2"
 
       - name: Resolve packages
         run: |
           xcodebuild -resolvePackageDependencies \
             -project WaRelay.xcodeproj \
             -scheme WaRelay
+
+      - name: Pick Simulator destination
+        id: sim
+        run: |
+          # Prefer a concrete iPhone simulator (avoids dual-arch generic destination races)
+          LINE=$(xcrun simctl list devices available | grep -E 'iPhone (16|15|14)' | head -n 1 || true)
+          if [ -z "$LINE" ]; then
+            LINE=$(xcrun simctl list devices available | grep 'iPhone' | head -n 1 || true)
+          fi
+          echo "Simulator line: $LINE"
+          UDID=$(echo "$LINE" | grep -oE '[0-9A-Fa-f-]{36}' | head -n 1)
+          if [ -z "$UDID" ]; then
+            echo "::error::No iPhone simulator found"
+            xcrun simctl list devices available
+            exit 1
+          fi
+          echo "udid=$UDID" >> "$GITHUB_OUTPUT"
+          echo "Using simulator: $UDID"
 
       - name: Build for Simulator
         run: |
@@ -46,9 +64,12 @@ jobs:
             -project WaRelay.xcodeproj \
             -scheme WaRelay \
             -configuration Debug \
-            -destination 'generic/platform=iOS Simulator' \
+            -sdk iphonesimulator \
+            -destination "platform=iOS Simulator,id=${{ steps.sim.outputs.udid }}" \
             -derivedDataPath build/DerivedData \
+            ONLY_ACTIVE_ARCH=YES \
             CODE_SIGNING_ALLOWED=NO \
+            COMPILER_INDEX_STORE_ENABLE=NO \
             build
 
       - name: Package .app
@@ -74,7 +95,7 @@ jobs:
 
   build-ipa:
     name: Archive IPA (signed)
-    runs-on: macos-14
+    runs-on: macos-15
     needs: build-simulator
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.build_signed_ipa }}
     defaults:
@@ -87,7 +108,7 @@ jobs:
       - name: Select Xcode
         uses: maxim-lobanov/setup-xcode@v1
         with:
-          xcode-version: "15.4"
+          xcode-version: "16.2"
 
       - name: Require signing secrets
         env:

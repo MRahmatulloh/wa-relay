@@ -20,7 +20,10 @@ on:
 jobs:
   build-simulator:
     name: Build (iOS Simulator)
-    runs-on: macos-15
+    # macos-14 + Xcode 15.4 ships with iPhone Simulator runtimes.
+    # macos-15 / Xcode 16.x often needs xcodebuild -downloadPlatform iOS which
+    # flakes on GHA with "Unable to connect to simulator" (exit 70).
+    runs-on: macos-14
     defaults:
       run:
         working-directory: ios
@@ -31,47 +34,27 @@ jobs:
       - name: Select Xcode
         uses: maxim-lobanov/setup-xcode@v1
         with:
-          xcode-version: "16.2"
+          xcode-version: "15.4"
 
-      - name: Ensure iOS Simulator runtime
+      - name: Verify Simulator SDK
         run: |
           set -e
           xcodebuild -runFirstLaunch || true
+          xcrun simctl list > /dev/null || true
           echo "Installed SDKs:"
-          xcodebuild -showsdks || true
-
-          # Placeholder "Any iOS Simulator Device" must NOT count as a real destination.
-          real_sim_line() {
-            xcodebuild -project WaRelay.xcodeproj -scheme WaRelay -showdestinations 2>&1 \
-              | grep 'platform:iOS Simulator' \
-              | grep 'name:iPhone' \
-              | grep -E 'id:[0-9A-Fa-f-]{36}' \
-              | grep -vi 'placeholder' \
-              | grep -vi 'Any iOS Simulator' \
-              | head -n 1 || true
-          }
-
-          LINE=$(real_sim_line)
-          if [ -z "$LINE" ]; then
-            echo "No real iPhone Simulator — downloading iOS platform (several minutes)…"
-            xcodebuild -downloadPlatform iOS
-            LINE=$(real_sim_line)
-          fi
-
-          if [ -z "$LINE" ]; then
-            echo "::error::Still no real iPhone Simulator after platform download"
-            xcodebuild -project WaRelay.xcodeproj -scheme WaRelay -showdestinations || true
-            xcrun simctl list devices available || true
+          xcodebuild -showsdks
+          if ! xcodebuild -showsdks 2>/dev/null | grep -q iphonesimulator; then
+            echo "::error::iphonesimulator SDK missing on this runner/Xcode"
             exit 1
           fi
-          echo "Real simulator available: $LINE"
+          echo "Available destinations:"
+          xcodebuild -project WaRelay.xcodeproj -scheme WaRelay -showdestinations || true
 
       - name: Pick Simulator destination
         id: sim
         run: |
           set -e
           SHOW=$(xcodebuild -project WaRelay.xcodeproj -scheme WaRelay -showdestinations 2>&1 || true)
-          echo "$SHOW"
           DEST=$(echo "$SHOW" \
             | grep 'platform:iOS Simulator' \
             | grep 'name:iPhone' \
@@ -79,23 +62,15 @@ jobs:
             | grep -vi 'placeholder' \
             | grep -vi 'Any iOS Simulator' \
             | head -n 1 || true)
-          if [ -z "$DEST" ]; then
-            echo "::error::No real iPhone Simulator destination (refusing placeholder)"
-            exit 1
-          fi
-          UDID=$(echo "$DEST" | sed -n 's/.*id:\([0-9A-Fa-f-]\{36\}\).*/\1/p')
-          NAME=$(echo "$DEST" | sed -n 's/.*name:\([^,}]*\).*/\1/p' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
-          OS=$(echo "$DEST" | sed -n 's/.*OS:\([^,}]*\).*/\1/p' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
-          if [ -n "$UDID" ]; then
+          if [ -n "$DEST" ]; then
+            UDID=$(echo "$DEST" | sed -n 's/.*id:\([0-9A-Fa-f-]\{36\}\).*/\1/p')
             SPEC="platform=iOS Simulator,id=$UDID"
-          elif [ -n "$NAME" ] && [ -n "$OS" ] && [ "$OS" != "latest" ]; then
-            SPEC="platform=iOS Simulator,name=$NAME,OS=$OS"
           else
-            echo "::error::Could not parse real simulator from: $DEST"
-            exit 1
+            # Compile-only: no need to boot a named device when SDK is present.
+            SPEC="generic/platform=iOS Simulator"
           fi
           echo "destination=$SPEC" >> "$GITHUB_OUTPUT"
-          echo "Using destination: $SPEC ($NAME / $OS)"
+          echo "Using destination: $SPEC"
 
       - name: Build for Simulator
         run: |
@@ -116,7 +91,7 @@ jobs:
           set -e
           if [ "$STATUS" -ne 0 ]; then
             echo "::group::Swift/compiler errors"
-            grep -E 'error:|fatal error:|BUILD FAILED' build.log | tail -n 80 || true
+            grep -E 'error:|fatal error:|BUILD FAILED|Unable to find' build.log | tail -n 80 || true
             echo "::endgroup::"
             exit "$STATUS"
           fi
@@ -144,7 +119,7 @@ jobs:
 
   build-ipa:
     name: Archive IPA (signed)
-    runs-on: macos-15
+    runs-on: macos-14
     needs: build-simulator
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.build_signed_ipa }}
     defaults:
@@ -157,7 +132,7 @@ jobs:
       - name: Select Xcode
         uses: maxim-lobanov/setup-xcode@v1
         with:
-          xcode-version: "16.2"
+          xcode-version: "15.4"
 
       - name: Require signing secrets
         env:

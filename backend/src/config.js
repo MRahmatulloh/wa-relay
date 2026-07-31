@@ -15,6 +15,10 @@ export const config = {
   baileysAuthDir: process.env.BAILEYS_AUTH_DIR || path.join(__dirname, '..', 'baileys_auth'),
   patternsEnv: process.env.PATTERNS || '',
   patternsFile: process.env.PATTERNS_FILE || path.join(__dirname, '..', 'config', 'patterns.json'),
+  /** QR page HTTP Basic Auth. Default on; set QR_BASIC_AUTH=false to disable. */
+  qrBasicAuth: !['0', 'false', 'no', 'off'].includes(
+    String(process.env.QR_BASIC_AUTH ?? 'true').toLowerCase(),
+  ),
   fcm: {
     projectId: process.env.FCM_PROJECT_ID || '',
     clientEmail: process.env.FCM_CLIENT_EMAIL || '',

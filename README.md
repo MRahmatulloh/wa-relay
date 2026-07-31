@@ -60,7 +60,7 @@ Source: `ios/WaRelay.xcodeproj` (SwiftUI, iOS 16+).
 Native iOS **cannot** be compiled on Windows. Use a cloud Mac runner:
 
 1. Push this repo to GitHub (remote is required)
-2. Actions → **iOS Build** runs on `macos-14` and uploads `WaRelay-ios-simulator` zip
+2. Actions → **iOS Build** runs on `macos-14` (Xcode 15.4) and uploads `WaRelay-ios-simulator` zip
 3. Optional: [Codemagic](https://codemagic.io) with [`codemagic.yaml`](codemagic.yaml)
 
 **Real iPhone install (Windows):** cloud must produce a **signed `.ipa`**, then install with [Sideloadly](https://sideloadly.io) (or TestFlight). That needs an Apple Developer account + signing secrets — see [`ios/README.md`](ios/README.md).

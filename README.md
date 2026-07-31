@@ -12,9 +12,9 @@ cp .env.example .env
 docker compose up --build
 ```
 
-- API: http://localhost:3000
-- QR login: http://localhost:3000/qr (HTTP Basic Auth — same username/password as app users)
-- Health: http://localhost:3000/health
+- API: http://localhost:4500
+- QR login: http://localhost:4500/qr (HTTP Basic Auth — same username/password as app users)
+- Health: http://localhost:4500/health
 
 ### Auth
 

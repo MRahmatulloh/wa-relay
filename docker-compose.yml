@@ -3,7 +3,10 @@ services:
     image: mongo:7
     restart: unless-stopped
     ports:
-      - "27017:27017"
+      - "27018:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
     volumes:
       - mongo_data:/data/db
     networks:
@@ -17,7 +20,6 @@ services:
     env_file:
       - .env
     environment:
-      MONGODB_URI: mongodb://mongo:27017/wa-relay
       BAILEYS_AUTH_DIR: /app/baileys_auth
     volumes:
       - baileys_auth:/app/baileys_auth

@@ -8,13 +8,16 @@ WhatsApp (Baileys) → Node backend (MongoDB, Docker) → Android APK / iOS app 
 
 ```bash
 cp .env.example .env
-# edit JWT_SECRET and PATTERNS
+# edit JWT_SECRET, MONGO_ROOT_PASSWORD, MONGODB_URI, and PATTERNS
 docker compose up --build
 ```
 
 - API: http://localhost:4500
 - QR login: http://localhost:4500/qr (HTTP Basic Auth — same username/password as app users)
 - Health: http://localhost:4500/health
+- MongoDB (auth): `localhost:27018` — URI like `mongodb://wa_relay:<password>@HOST:27018/wa-relay?authSource=admin`
+
+`MONGO_INITDB_*` credentials apply only on a **fresh** Mongo volume. If `mongo_data` already exists without auth, recreate it (`docker compose down` then remove the volume) before enabling auth.
 
 ### Auth
 

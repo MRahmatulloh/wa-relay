@@ -1,13 +1,21 @@
 import Foundation
 import UIKit
 import UserNotifications
+#if canImport(FirebaseCore)
+import FirebaseCore
+#endif
+#if canImport(FirebaseMessaging)
+import FirebaseMessaging
+#endif
 
-/// Local notifications + device token registration.
-/// Remote FCM/APNs via Firebase SPM is deferred (heavy CI fails on nanopb); backend skips `local-…` tokens.
+/// Registers for remote notifications and exposes a push token for `/devices/register`.
+/// Primary path: native APNs device token (hex) — works without Firebase.
+/// Optional: FCM token when `GoogleService-Info.plist` is present.
 @MainActor
 final class PushManager: NSObject, ObservableObject {
     static let shared = PushManager()
 
+    private let apnsKey = "apns_device_token_hex"
     private(set) var pushToken: String?
     var onToken: ((String) -> Void)?
 
@@ -15,8 +23,17 @@ final class PushManager: NSObject, ObservableObject {
         super.init()
     }
 
-    func configure() {
-        // Placeholder for future Firebase wiring.
+    func configureFirebaseIfNeeded() {
+        #if canImport(FirebaseCore)
+        guard FirebaseApp.app() == nil else { return }
+        guard Bundle.main.path(forResource: "GoogleService-Info", ofType: "plist") != nil else {
+            return
+        }
+        FirebaseApp.configure()
+        #if canImport(FirebaseMessaging)
+        Messaging.messaging().delegate = self
+        #endif
+        #endif
     }
 
     func requestPermissionAndRegister() {
@@ -31,19 +48,41 @@ final class PushManager: NSObject, ObservableObject {
     }
 
     func setAPNsToken(_ deviceToken: Data) {
+        #if canImport(FirebaseMessaging)
+        if FirebaseApp.app() != nil {
+            Messaging.messaging().apnsToken = deviceToken
+        }
+        #endif
         let hex = deviceToken.map { String(format: "%02.2hhx", $0) }.joined()
-        // Not an FCM token — store for diagnostics; registration still uses local fallback until Firebase is added.
-        UserDefaults.standard.set(hex, forKey: "apns_device_token_hex")
-        refreshToken()
+        UserDefaults.standard.set(hex, forKey: apnsKey)
+        emit(hex)
     }
 
     func refreshToken() {
-        emitLocalFallback()
+        if let hex = UserDefaults.standard.string(forKey: apnsKey), !hex.isEmpty {
+            emit(hex)
+            return
+        }
+        #if canImport(FirebaseMessaging)
+        guard FirebaseApp.app() != nil else { return }
+        Messaging.messaging().token { [weak self] token, error in
+            Task { @MainActor in
+                guard let token, error == nil else { return }
+                self?.emit(token)
+            }
+        }
+        #endif
     }
 
-    func currentTokenOrFallback() -> String {
-        if let pushToken, !pushToken.isEmpty { return pushToken }
-        return localFallbackToken()
+    /// Real APNs hex or FCM token. Nil until the system grants a device token (no `local-` stub).
+    func currentTokenOrFallback() -> String? {
+        if let pushToken, !pushToken.isEmpty, !pushToken.hasPrefix("local-") {
+            return pushToken
+        }
+        if let hex = UserDefaults.standard.string(forKey: apnsKey), !hex.isEmpty {
+            return hex
+        }
+        return nil
     }
 
     func scheduleLocalTestNotification() {
@@ -60,22 +99,27 @@ final class PushManager: NSObject, ObservableObject {
         UNUserNotificationCenter.current().add(req)
     }
 
-    private func emitLocalFallback() {
-        let token = localFallbackToken()
+    private func emit(_ token: String) {
         pushToken = token
         onToken?(token)
     }
+}
 
-    private func localFallbackToken() -> String {
-        let key = "local_fcm_fallback"
-        if let existing = UserDefaults.standard.string(forKey: key) {
-            return existing
+#if canImport(FirebaseMessaging)
+extension PushManager: MessagingDelegate {
+    nonisolated func messaging(_ messaging: Messaging, didReceiveRegistrationToken fcmToken: String?) {
+        Task { @MainActor in
+            // Prefer APNs hex for direct APNs backend; only use FCM if APNs not yet available.
+            if let hex = UserDefaults.standard.string(forKey: self.apnsKey), !hex.isEmpty {
+                self.emit(hex)
+                return
+            }
+            guard let fcmToken else { return }
+            self.emit(fcmToken)
         }
-        let token = "local-\(UUID().uuidString)"
-        UserDefaults.standard.set(token, forKey: key)
-        return token
     }
 }
+#endif
 
 extension PushManager: UNUserNotificationCenterDelegate {
     nonisolated func userNotificationCenter(

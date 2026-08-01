@@ -5,6 +5,13 @@ struct AuthResult: Sendable {
     let username: String
 }
 
+struct HealthResult: Sendable {
+    let ok: Bool
+    let whatsappStatus: String
+    let whatsappOk: Bool
+    let hasQr: Bool
+}
+
 struct MessagesPage: Sendable {
     let messages: [MatchedMessage]
     let hasMore: Bool
@@ -16,6 +23,7 @@ struct MessageQuery: Sendable {
     var unread: Bool? = nil
     var starred: Bool? = nil
     var done: Bool? = nil
+    var thumbsUp: Bool? = nil
     var isGroup: Bool? = nil
     var folder: String? = nil
     var limit: Int = 40
@@ -58,6 +66,29 @@ actor ApiClient {
         try await auth(path: "/auth/register", username: username, password: password)
     }
 
+    func fetchHealth() async throws -> HealthResult {
+        let url = URL(string: host() + "/health")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        let (data, response) = try await session.data(for: request)
+        guard let http = response as? HTTPURLResponse else { throw ApiError.invalidResponse }
+        guard (200...299).contains(http.statusCode) else {
+            throw ApiError.http(http.statusCode, nil)
+        }
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw ApiError.invalidResponse
+        }
+        let wa = json["whatsapp"] as? [String: Any]
+        let status = (wa?["status"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? "unknown"
+        let connected = wa?["connected"] as? Bool ?? (status == "open")
+        return HealthResult(
+            ok: json["ok"] as? Bool ?? true,
+            whatsappStatus: status,
+            whatsappOk: wa?["ok"] as? Bool ?? connected,
+            hasQr: wa?["hasQr"] as? Bool ?? false
+        )
+    }
+
     func fetchMessages(token: String, query: MessageQuery = MessageQuery()) async throws -> MessagesPage {
         var components = URLComponents(string: host() + "/messages")!
         var items: [URLQueryItem] = [
@@ -67,6 +98,7 @@ actor ApiClient {
         if let unread = query.unread { items.append(URLQueryItem(name: "unread", value: String(unread))) }
         if let starred = query.starred { items.append(URLQueryItem(name: "starred", value: String(starred))) }
         if let done = query.done { items.append(URLQueryItem(name: "done", value: String(done))) }
+        if let thumbsUp = query.thumbsUp { items.append(URLQueryItem(name: "thumbsUp", value: String(thumbsUp))) }
         if let isGroup = query.isGroup { items.append(URLQueryItem(name: "isGroup", value: String(isGroup))) }
         if let folder = query.folder, !folder.isEmpty, folder != "all" {
             items.append(URLQueryItem(name: "folder", value: folder))
@@ -105,17 +137,41 @@ actor ApiClient {
         return Dictionary(uniqueKeysWithValues: keys.map { ($0, counts[$0] as? Int ?? 0) })
     }
 
+    /// Mark unread messages as read. Pass folder api value, or `all`/nil for every folder.
+    func markAllRead(token: String, folder: String? = nil) async throws -> [String: Int] {
+        let url = URL(string: host() + "/messages/mark-all-read")!
+        var body: [String: Any] = [:]
+        if let folder, !folder.isEmpty {
+            body["folder"] = folder
+        }
+        let (data, response) = try await authorizedRequest(
+            url: url,
+            method: "POST",
+            token: token,
+            jsonBody: body
+        )
+        try throwIfFailed(response, data: data)
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let counts = json["counts"] as? [String: Any] else {
+            throw ApiError.invalidResponse
+        }
+        let keys = ["all", "lgw", "lhr", "ltn", "stn", "others"]
+        return Dictionary(uniqueKeysWithValues: keys.map { ($0, counts[$0] as? Int ?? 0) })
+    }
+
     func patchMessage(
         token: String,
         id: String,
         read: Bool? = nil,
         starred: Bool? = nil,
-        done: Bool? = nil
+        done: Bool? = nil,
+        thumbsUp: Bool? = nil
     ) async throws -> MatchedMessage {
         var body: [String: Any] = [:]
         if let read { body["read"] = read }
         if let starred { body["starred"] = starred }
         if let done { body["done"] = done }
+        if let thumbsUp { body["thumbsUp"] = thumbsUp }
         let url = URL(string: host() + "/messages/\(id)")!
         let (data, response) = try await authorizedRequest(
             url: url,
@@ -123,7 +179,7 @@ actor ApiClient {
             token: token,
             jsonBody: body
         )
-        try throwIfUnauthorized(response)
+        try throwIfFailed(response, data: data)
         guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
               let message = json["message"] as? [String: Any] else {
             throw ApiError.invalidResponse
@@ -135,6 +191,7 @@ actor ApiClient {
         let url = URL(string: host() + "/devices/register")!
         let body: [String: Any] = [
             "fcmToken": fcmToken,
+            "pushToken": fcmToken,
             "platform": "ios",
         ]
         let (_, response) = try await authorizedRequest(
@@ -196,6 +253,16 @@ actor ApiClient {
         }
         if let http = response as? HTTPURLResponse, !(200...299).contains(http.statusCode) {
             throw ApiError.http(http.statusCode, nil)
+        }
+    }
+
+    private func throwIfFailed(_ response: URLResponse, data: Data) throws {
+        if let http = response as? HTTPURLResponse, http.statusCode == 401 {
+            throw ApiError.unauthorized
+        }
+        if let http = response as? HTTPURLResponse, !(200...299).contains(http.statusCode) {
+            let err = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["error"] as? String
+            throw ApiError.http(http.statusCode, err)
         }
     }
 

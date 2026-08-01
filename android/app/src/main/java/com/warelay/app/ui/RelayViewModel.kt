@@ -21,6 +21,7 @@ enum class InboxFilter {
     ALL,
     UNREAD,
     STARRED,
+    THUMBS_UP,
     DONE,
     GROUPS,
 }
@@ -33,6 +34,15 @@ enum class InboxFolder(val apiValue: String) {
     STN("stn"),
     OTHERS("others"),
 }
+
+data class WhatsAppSessionStatus(
+    val loading: Boolean = false,
+    val reachable: Boolean = false,
+    val status: String? = null,
+    val ok: Boolean = false,
+    val hasQr: Boolean = false,
+    val error: String? = null,
+)
 
 data class UiState(
     val hostUrl: String = "http://10.0.2.2:3000",
@@ -51,12 +61,14 @@ data class UiState(
     val info: String? = null,
     /** False until DataStore session is read once — avoids login flash on cold start. */
     val sessionReady: Boolean = false,
+    val whatsappSession: WhatsAppSessionStatus = WhatsAppSessionStatus(),
 )
 
 class RelayViewModel(private val container: AppContainer) : ViewModel() {
     private val _state = MutableStateFlow(UiState())
     val state: StateFlow<UiState> = _state.asStateFlow()
     private var searchJob: Job? = null
+    private var healthPollJob: Job? = null
 
     init {
         viewModelScope.launch {
@@ -113,10 +125,63 @@ class RelayViewModel(private val container: AppContainer) : ViewModel() {
         viewModelScope.launch {
             container.preferences.setHostUrl(url)
             _state.update { it.copy(info = "Host saved", error = null) }
+            loadWhatsAppSession(showLoading = true)
             val token = container.preferences.getToken()
             if (token != null) {
                 container.socketManager.disconnect()
                 connectAndLoad(token)
+            }
+        }
+    }
+
+    /** Start polling /health while Settings is open. */
+    fun startWhatsAppSessionPolling() {
+        if (healthPollJob?.isActive == true) return
+        healthPollJob = viewModelScope.launch {
+            while (true) {
+                loadWhatsAppSession(showLoading = _state.value.whatsappSession.status == null)
+                delay(3_000)
+            }
+        }
+    }
+
+    fun stopWhatsAppSessionPolling() {
+        healthPollJob?.cancel()
+        healthPollJob = null
+    }
+
+    fun refreshWhatsAppSession() {
+        viewModelScope.launch { loadWhatsAppSession(showLoading = true) }
+    }
+
+    private suspend fun loadWhatsAppSession(showLoading: Boolean) {
+        if (showLoading) {
+            _state.update {
+                it.copy(whatsappSession = it.whatsappSession.copy(loading = true, error = null))
+            }
+        }
+        try {
+            val health = container.api.fetchHealth()
+            _state.update {
+                it.copy(
+                    whatsappSession = WhatsAppSessionStatus(
+                        loading = false,
+                        reachable = health.ok,
+                        status = health.whatsappStatus,
+                        ok = health.whatsappOk,
+                        hasQr = health.hasQr,
+                    ),
+                )
+            }
+        } catch (e: Exception) {
+            _state.update {
+                it.copy(
+                    whatsappSession = WhatsAppSessionStatus(
+                        loading = false,
+                        reachable = false,
+                        error = e.message ?: "Health check failed",
+                    ),
+                )
             }
         }
     }
@@ -218,12 +283,56 @@ class RelayViewModel(private val container: AppContainer) : ViewModel() {
         patch(msg, starred = !msg.starred)
     }
 
+    fun toggleThumbsUp(msg: MatchedMessage) {
+        patch(msg, thumbsUp = !msg.thumbsUp)
+    }
+
     fun toggleDone(msg: MatchedMessage) {
         patch(msg, done = !msg.done)
     }
 
     fun markRead(msg: MatchedMessage, read: Boolean) {
         patch(msg, read = read)
+    }
+
+    fun markAllSeen() {
+        val token = _state.value.token ?: return
+        val folder = _state.value.folder
+        val folderParam = folder.apiValue
+        val now = java.time.Instant.now().toString()
+        _state.update { st ->
+            val nextMessages = st.messages.map { m ->
+                if (m.isUnread) m.copy(readAt = now) else m
+            }.filter { matchesCurrentFilter(it, st.folder, st.filter, st.searchQuery) }
+            val nextCounts = if (folder == InboxFolder.ALL) {
+                mapOf("all" to 0, "lgw" to 0, "lhr" to 0, "ltn" to 0, "stn" to 0, "others" to 0)
+            } else {
+                val cleared = st.folderUnread[folderParam] ?: 0
+                st.folderUnread.toMutableMap().apply {
+                    this[folderParam] = 0
+                    this["all"] = ((this["all"] ?: 0) - cleared).coerceAtLeast(0)
+                }
+            }
+            st.copy(messages = nextMessages, folderUnread = nextCounts, error = null)
+        }
+        viewModelScope.launch {
+            try {
+                val counts = container.api.markAllRead(
+                    token = token,
+                    folder = if (folder == InboxFolder.ALL) "all" else folderParam,
+                )
+                _state.update { it.copy(folderUnread = counts) }
+                if (_state.value.filter == InboxFilter.UNREAD) {
+                    loadMessages(token, reset = true)
+                }
+            } catch (_: UnauthorizedException) {
+                container.preferences.clearSession()
+                _state.update { it.copy(error = "Session expired") }
+            } catch (e: Exception) {
+                _state.update { it.copy(error = e.message ?: "Mark all seen failed") }
+                refresh()
+            }
+        }
     }
 
     fun clearMessages() {
@@ -235,6 +344,7 @@ class RelayViewModel(private val container: AppContainer) : ViewModel() {
         read: Boolean? = null,
         starred: Boolean? = null,
         done: Boolean? = null,
+        thumbsUp: Boolean? = null,
     ) {
         val token = _state.value.token ?: return
         if (msg.id.isBlank()) return
@@ -247,6 +357,7 @@ class RelayViewModel(private val container: AppContainer) : ViewModel() {
                     else m.copy(
                         starred = starred ?: m.starred,
                         done = done ?: m.done,
+                        thumbsUp = thumbsUp ?: m.thumbsUp,
                         readAt = when (read) {
                             true -> m.readAt ?: java.time.Instant.now().toString()
                             false -> null
@@ -271,6 +382,7 @@ class RelayViewModel(private val container: AppContainer) : ViewModel() {
                     read = read,
                     starred = starred,
                     done = done,
+                    thumbsUp = thumbsUp,
                 )
                 _state.update { st ->
                     val merged = st.messages
@@ -386,6 +498,7 @@ class RelayViewModel(private val container: AppContainer) : ViewModel() {
                 InboxFilter.ALL -> ApiClient.MessageQuery(q = q, folder = folderParam)
                 InboxFilter.UNREAD -> ApiClient.MessageQuery(q = q, unread = true, folder = folderParam)
                 InboxFilter.STARRED -> ApiClient.MessageQuery(q = q, starred = true, folder = folderParam)
+                InboxFilter.THUMBS_UP -> ApiClient.MessageQuery(q = q, thumbsUp = true, folder = folderParam)
                 InboxFilter.DONE -> ApiClient.MessageQuery(q = q, done = true, folder = folderParam)
                 InboxFilter.GROUPS -> ApiClient.MessageQuery(q = q, isGroup = true, folder = folderParam)
             }
@@ -408,6 +521,7 @@ class RelayViewModel(private val container: AppContainer) : ViewModel() {
                     msg.text,
                     msg.senderName,
                     msg.senderPhone,
+                    msg.groupName,
                     msg.matchedPattern,
                 ).joinToString(" ").lowercase()
                 if (!hay.contains(q.lowercase())) return false
@@ -416,6 +530,7 @@ class RelayViewModel(private val container: AppContainer) : ViewModel() {
                 InboxFilter.ALL -> true
                 InboxFilter.UNREAD -> msg.isUnread
                 InboxFilter.STARRED -> msg.starred
+                InboxFilter.THUMBS_UP -> msg.thumbsUp
                 InboxFilter.DONE -> msg.done
                 InboxFilter.GROUPS -> msg.isGroup
             }

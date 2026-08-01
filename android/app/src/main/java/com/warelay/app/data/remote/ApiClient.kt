@@ -23,6 +23,13 @@ class ApiClient(private val preferences: UserPreferences) {
 
     data class AuthResult(val token: String, val username: String)
 
+    data class HealthResult(
+        val ok: Boolean,
+        val whatsappStatus: String,
+        val whatsappOk: Boolean,
+        val hasQr: Boolean,
+    )
+
     data class MessagesPage(
         val messages: List<MatchedMessage>,
         val hasMore: Boolean,
@@ -34,6 +41,7 @@ class ApiClient(private val preferences: UserPreferences) {
         val unread: Boolean? = null,
         val starred: Boolean? = null,
         val done: Boolean? = null,
+        val thumbsUp: Boolean? = null,
         val isGroup: Boolean? = null,
         val folder: String? = null,
         val limit: Int = 40,
@@ -46,6 +54,28 @@ class ApiClient(private val preferences: UserPreferences) {
 
     suspend fun login(username: String, password: String): AuthResult =
         auth("/auth/login", username, password)
+
+    suspend fun fetchHealth(): HealthResult = withContext(Dispatchers.IO) {
+        val req = Request.Builder()
+            .url(preferences.getHostUrl().trimEnd('/') + "/health")
+            .get()
+            .build()
+        client.newCall(req).execute().use { res ->
+            val text = res.body?.string().orEmpty()
+            if (!res.isSuccessful) throw ApiException("HTTP ${res.code}")
+            val json = JSONObject(text)
+            val wa = json.optJSONObject("whatsapp")
+            val status = wa?.optString("status").orEmpty().ifBlank { "unknown" }
+            val connected = wa?.optBoolean("connected", status == "open")
+                ?: (status == "open")
+            HealthResult(
+                ok = json.optBoolean("ok", true),
+                whatsappStatus = status,
+                whatsappOk = wa?.optBoolean("ok", connected) ?: connected,
+                hasQr = wa?.optBoolean("hasQr", false) ?: false,
+            )
+        }
+    }
 
     private suspend fun auth(path: String, username: String, password: String): AuthResult =
         withContext(Dispatchers.IO) {
@@ -81,6 +111,7 @@ class ApiClient(private val preferences: UserPreferences) {
             query.unread?.let { urlBuilder.addQueryParameter("unread", it.toString()) }
             query.starred?.let { urlBuilder.addQueryParameter("starred", it.toString()) }
             query.done?.let { urlBuilder.addQueryParameter("done", it.toString()) }
+            query.thumbsUp?.let { urlBuilder.addQueryParameter("thumbsUp", it.toString()) }
             query.isGroup?.let { urlBuilder.addQueryParameter("isGroup", it.toString()) }
             if (!query.folder.isNullOrBlank() && query.folder != "all") {
                 urlBuilder.addQueryParameter("folder", query.folder)
@@ -125,17 +156,47 @@ class ApiClient(private val preferences: UserPreferences) {
             }
         }
 
+    /**
+     * Mark unread messages as read. Pass folder api value, or null/"all" for every folder.
+     * @return updated per-folder unread counts
+     */
+    suspend fun markAllRead(token: String, folder: String? = null): Map<String, Int> =
+        withContext(Dispatchers.IO) {
+            val bodyJson = JSONObject()
+            val folderParam = folder?.trim()?.lowercase().orEmpty()
+            if (folderParam.isNotEmpty()) bodyJson.put("folder", folderParam)
+            val body = bodyJson.toString().toRequestBody(jsonMedia)
+            val req = Request.Builder()
+                .url(preferences.getHostUrl().trimEnd('/') + "/messages/mark-all-read")
+                .header("Authorization", "Bearer $token")
+                .post(body)
+                .build()
+            client.newCall(req).execute().use { res ->
+                val text = res.body?.string().orEmpty()
+                if (res.code == 401) throw UnauthorizedException()
+                if (!res.isSuccessful) {
+                    val err = runCatching { JSONObject(text).optString("error") }.getOrNull()
+                    throw ApiException(err?.ifBlank { null } ?: "HTTP ${res.code}")
+                }
+                val obj = JSONObject(text).getJSONObject("counts")
+                val keys = listOf("all", "lgw", "lhr", "ltn", "stn", "others")
+                keys.associateWith { obj.optInt(it, 0) }
+            }
+        }
+
     suspend fun patchMessage(
         token: String,
         id: String,
         read: Boolean? = null,
         starred: Boolean? = null,
         done: Boolean? = null,
+        thumbsUp: Boolean? = null,
     ): MatchedMessage = withContext(Dispatchers.IO) {
         val bodyJson = JSONObject()
         if (read != null) bodyJson.put("read", read)
         if (starred != null) bodyJson.put("starred", starred)
         if (done != null) bodyJson.put("done", done)
+        if (thumbsUp != null) bodyJson.put("thumbsUp", thumbsUp)
         val body = bodyJson.toString().toRequestBody(jsonMedia)
         val req = Request.Builder()
             .url(preferences.getHostUrl().trimEnd('/') + "/messages/$id")
@@ -189,6 +250,7 @@ class ApiClient(private val preferences: UserPreferences) {
                 text = obj.optString("text"),
                 senderPhone = optNullableString(obj, "senderPhone"),
                 senderName = optNullableString(obj, "senderName"),
+                groupName = optNullableString(obj, "groupName"),
                 chatId = obj.optString("chatId"),
                 isGroup = obj.optBoolean("isGroup"),
                 waLink = optNullableString(obj, "waLink"),
@@ -199,6 +261,7 @@ class ApiClient(private val preferences: UserPreferences) {
                 readAt = optNullableString(obj, "readAt"),
                 starred = obj.optBoolean("starred", false),
                 done = obj.optBoolean("done", false),
+                thumbsUp = obj.optBoolean("thumbsUp", false),
             )
 
         /**

@@ -78,4 +78,6 @@ Simulator `.app` artifacts do **not** install on a physical iPhone.
 
 ### iOS push note
 
-Backend already sends FCM `android` + `apns` payloads. The iOS app currently uses REST + 3s polling (no Firebase/Socket.IO SPM, so GitHub Actions can build cleanly) and registers a `local-…` token (skipped by backend). Remote push / Socket.io can be re-added later when signing + Mac tooling are available.
+- **Foreground:** Socket.IO `message:matched`
+- **Background (no Firebase):** set `APNS_KEY_ID`, `APNS_TEAM_ID`, `APNS_BUNDLE_ID`, `APNS_KEY_P8` (or `APNS_KEY_PATH`) in `.env` — see [`ios/README.md`](ios/README.md). The app registers the native APNs device token.
+- **Android:** still uses FCM (`FCM_*` + `google-services.json`).

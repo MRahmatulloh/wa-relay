@@ -9,13 +9,15 @@ import devicesRoutes from './routes/devices.js';
 import qrRoutes from './routes/qr.js';
 import { createTestRoutes } from './routes/test.js';
 import { createSocketServer } from './socket.js';
+import { initApns } from './services/apns.js';
 import { initFcm } from './services/fcm.js';
-import { setBroadcast, startBaileys } from './services/baileys.js';
+import { getConnectionStatus, getQrDataUrl, setBroadcast, startBaileys } from './services/baileys.js';
 
 async function main() {
   await mongoose.connect(config.mongoUri);
   console.log('MongoDB connected');
 
+  initApns();
   initFcm();
 
   const app = express();
@@ -23,7 +25,17 @@ async function main() {
   app.use(express.json({ limit: '1mb' }));
 
   app.get('/health', (req, res) => {
-    res.json({ ok: true });
+    const status = getConnectionStatus();
+    const connected = status === 'open';
+    res.json({
+      ok: true,
+      whatsapp: {
+        status,
+        ok: connected,
+        connected,
+        hasQr: Boolean(getQrDataUrl()),
+      },
+    });
   });
 
   const server = http.createServer(app);

@@ -17,7 +17,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
-        PushManager.shared.configure()
+        PushManager.shared.configureFirebaseIfNeeded()
         return true
     }
 
@@ -33,6 +33,5 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         didFailToRegisterForRemoteNotificationsWithError error: Error
     ) {
         print("APNs registration failed:", error.localizedDescription)
-        PushManager.shared.refreshToken()
     }
 }

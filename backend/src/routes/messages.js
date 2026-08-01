@@ -2,6 +2,7 @@ import { Router } from 'express';
 import mongoose from 'mongoose';
 import { Message, serializeMessage } from '../models/Message.js';
 import { authMiddleware } from '../middleware/auth.js';
+import { sendThumbsUpReaction } from '../services/baileys.js';
 
 const router = Router();
 
@@ -26,6 +27,9 @@ function buildListFilter(query) {
   const done = parseBool(query.done);
   if (done !== null) filter.done = done;
 
+  const thumbsUp = parseBool(query.thumbsUp);
+  if (thumbsUp !== null) filter.thumbsUp = thumbsUp;
+
   const isGroup = parseBool(query.isGroup);
   if (isGroup !== null) filter.isGroup = isGroup;
 
@@ -41,6 +45,7 @@ function buildListFilter(query) {
       { text: re },
       { senderName: re },
       { senderPhone: re },
+      { groupName: re },
       { matchedPattern: re },
     ];
   }
@@ -98,26 +103,52 @@ router.get('/', authMiddleware, async (req, res) => {
   }
 });
 
+async function computeUnreadCounts() {
+  const rows = await Message.aggregate([
+    { $match: { readAt: null } },
+    { $group: { _id: { $ifNull: ['$folder', 'others'] }, count: { $sum: 1 } } },
+  ]);
+  const counts = { all: 0, lgw: 0, lhr: 0, ltn: 0, stn: 0, others: 0 };
+  for (const row of rows) {
+    const key = String(row._id || 'others').toLowerCase();
+    const n = Number(row.count) || 0;
+    if (Object.prototype.hasOwnProperty.call(counts, key)) {
+      counts[key] = n;
+    } else {
+      counts.others += n;
+    }
+    counts.all += n;
+  }
+  return counts;
+}
+
 router.get('/unread-counts', authMiddleware, async (_req, res) => {
   try {
-    const rows = await Message.aggregate([
-      { $match: { readAt: null } },
-      { $group: { _id: { $ifNull: ['$folder', 'others'] }, count: { $sum: 1 } } },
-    ]);
-    const counts = { all: 0, lgw: 0, lhr: 0, ltn: 0, stn: 0, others: 0 };
-    for (const row of rows) {
-      const key = String(row._id || 'others').toLowerCase();
-      const n = Number(row.count) || 0;
-      if (Object.prototype.hasOwnProperty.call(counts, key)) {
-        counts[key] = n;
-      } else {
-        counts.others += n;
-      }
-      counts.all += n;
-    }
-    return res.json({ counts });
+    return res.json({ counts: await computeUnreadCounts() });
   } catch (err) {
     console.error('unread-counts error', err);
+    return res.status(500).json({ error: 'Server error' });
+  }
+});
+
+/** Mark all unread messages as read in the current folder (`all` / omit = every folder). */
+router.post('/mark-all-read', authMiddleware, async (req, res) => {
+  try {
+    const folder = String(req.body?.folder ?? req.query?.folder ?? '')
+      .trim()
+      .toLowerCase();
+    const filter = { readAt: null };
+    if (folder && folder !== 'all') {
+      filter.folder = folder;
+    }
+    const result = await Message.updateMany(filter, { $set: { readAt: new Date() } });
+    const counts = await computeUnreadCounts();
+    return res.json({
+      modifiedCount: result.modifiedCount ?? result.nModified ?? 0,
+      counts,
+    });
+  } catch (err) {
+    console.error('mark-all-read error', err);
     return res.status(500).json({ error: 'Server error' });
   }
 });
@@ -125,16 +156,42 @@ router.get('/unread-counts', authMiddleware, async (_req, res) => {
 router.patch('/:id', authMiddleware, async (req, res) => {
   try {
     const id = req.params.id;
-    const update = {};
+    if (!mongoose.isValidObjectId(id)) {
+      return res.status(400).json({ error: 'Invalid id' });
+    }
 
+    const update = {};
     if (typeof req.body.starred === 'boolean') update.starred = req.body.starred;
     if (typeof req.body.done === 'boolean') update.done = req.body.done;
     if (typeof req.body.read === 'boolean') {
       update.readAt = req.body.read ? new Date() : null;
     }
+    const hasThumbsUp = typeof req.body.thumbsUp === 'boolean';
+
+    if (!Object.keys(update).length && !hasThumbsUp) {
+      return res.status(400).json({ error: 'No valid fields (read, starred, done, thumbsUp)' });
+    }
+
+    const existing = await Message.findById(id).lean();
+    if (!existing) return res.status(404).json({ error: 'Message not found' });
+
+    if (hasThumbsUp) {
+      const enabled = req.body.thumbsUp;
+      if (!!existing.thumbsUp !== enabled) {
+        try {
+          await sendThumbsUpReaction(existing, enabled);
+        } catch (err) {
+          console.error('thumbsUp reaction error', err);
+          return res.status(503).json({
+            error: err?.message || 'Failed to send WhatsApp reaction',
+          });
+        }
+        update.thumbsUp = enabled;
+      }
+    }
 
     if (!Object.keys(update).length) {
-      return res.status(400).json({ error: 'No valid fields (read, starred, done)' });
+      return res.json({ message: serializeMessage(existing) });
     }
 
     const saved = await Message.findByIdAndUpdate(id, { $set: update }, { new: true }).lean();

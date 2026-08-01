@@ -17,9 +17,14 @@ enum UserPreferences {
     }
 
     static func setHostURL(_ url: String) {
-        let cleaned = url
+        var cleaned = url
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        if !cleaned.isEmpty,
+           !cleaned.lowercased().hasPrefix("http://"),
+           !cleaned.lowercased().hasPrefix("https://") {
+            cleaned = "http://\(cleaned)"
+        }
         UserDefaults.standard.set(cleaned, forKey: hostKey)
     }
 

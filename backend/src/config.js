@@ -15,6 +15,8 @@ export const config = {
   baileysAuthDir: process.env.BAILEYS_AUTH_DIR || path.join(__dirname, '..', 'baileys_auth'),
   patternsEnv: process.env.PATTERNS || '',
   patternsFile: process.env.PATTERNS_FILE || path.join(__dirname, '..', 'config', 'patterns.json'),
+  /** Skip same sender+text within this window (ms). Default 10 minutes. */
+  dedupeWindowMs: Math.max(0, Number(process.env.DEDUPE_WINDOW_MS) || 10 * 60 * 1000),
   /** QR page HTTP Basic Auth. Default on; set QR_BASIC_AUTH=false to disable. */
   qrBasicAuth: !['0', 'false', 'no', 'off'].includes(
     String(process.env.QR_BASIC_AUTH ?? 'true').toLowerCase(),
@@ -23,5 +25,16 @@ export const config = {
     projectId: process.env.FCM_PROJECT_ID || '',
     clientEmail: process.env.FCM_CLIENT_EMAIL || '',
     privateKey: (process.env.FCM_PRIVATE_KEY || '').replace(/\\n/g, '\n'),
+  },
+  /** Direct Apple Push (iOS) — no Firebase required when these are set. */
+  apns: {
+    keyId: process.env.APNS_KEY_ID || '',
+    teamId: process.env.APNS_TEAM_ID || '',
+    bundleId: process.env.APNS_BUNDLE_ID || 'com.warelay.app',
+    keyP8: (process.env.APNS_KEY_P8 || '').replace(/\\n/g, '\n'),
+    keyPath: process.env.APNS_KEY_PATH || '',
+    production: ['1', 'true', 'yes', 'on'].includes(
+      String(process.env.APNS_PRODUCTION || '').toLowerCase(),
+    ),
   },
 };

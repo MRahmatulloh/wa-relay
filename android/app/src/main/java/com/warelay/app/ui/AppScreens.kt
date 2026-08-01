@@ -1,5 +1,7 @@
 package com.warelay.app.ui
 
+import java.net.URLEncoder
+import java.nio.charset.StandardCharsets
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
@@ -18,7 +20,6 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
@@ -35,6 +36,7 @@ import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.KeyboardArrowUp
@@ -44,6 +46,8 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarBorder
+import androidx.compose.material.icons.filled.ThumbUp
+import androidx.compose.material.icons.outlined.ThumbUp
 import androidx.compose.material3.Badge
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -64,6 +68,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -111,8 +116,13 @@ fun AppNav(
     onFolderChange: (InboxFolder) -> Unit,
     onToggleExpanded: (MatchedMessage) -> Unit,
     onToggleStar: (MatchedMessage) -> Unit,
+    onToggleThumbsUp: (MatchedMessage) -> Unit,
     onToggleDone: (MatchedMessage) -> Unit,
+    onMarkAllSeen: () -> Unit,
     onTestLocalNotification: () -> Unit,
+    onStartSessionPolling: () -> Unit,
+    onStopSessionPolling: () -> Unit,
+    onRefreshSession: () -> Unit,
 ) {
     if (!state.sessionReady) {
         SplashScreen()
@@ -145,12 +155,16 @@ fun AppNav(
             SettingsScreen(
                 hostUrl = state.hostUrl,
                 username = state.username,
+                whatsappSession = state.whatsappSession,
                 onSave = {
                     onSaveHost(it)
                     nav.popBackStack()
                 },
                 onBack = { nav.popBackStack() },
                 onTestLocalNotification = onTestLocalNotification,
+                onStartSessionPolling = onStartSessionPolling,
+                onStopSessionPolling = onStopSessionPolling,
+                onRefreshSession = onRefreshSession,
             )
         }
         composable("messages") {
@@ -167,7 +181,9 @@ fun AppNav(
                 onFolderChange = onFolderChange,
                 onToggleExpanded = onToggleExpanded,
                 onToggleStar = onToggleStar,
+                onToggleThumbsUp = onToggleThumbsUp,
                 onToggleDone = onToggleDone,
+                onMarkAllSeen = onMarkAllSeen,
             )
         }
     }
@@ -207,11 +223,21 @@ private fun SplashScreen() {
 fun SettingsScreen(
     hostUrl: String,
     username: String?,
+    whatsappSession: WhatsAppSessionStatus,
     onSave: (String) -> Unit,
     onBack: () -> Unit,
     onTestLocalNotification: () -> Unit,
+    onStartSessionPolling: () -> Unit,
+    onStopSessionPolling: () -> Unit,
+    onRefreshSession: () -> Unit,
 ) {
     var value by remember(hostUrl) { mutableStateOf(hostUrl) }
+    LaunchedEffect(Unit) {
+        onStartSessionPolling()
+    }
+    DisposableEffect(Unit) {
+        onDispose { onStopSessionPolling() }
+    }
     Scaffold(
         topBar = {
             TopAppBar(
@@ -219,6 +245,11 @@ fun SettingsScreen(
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back")
+                    }
+                },
+                actions = {
+                    IconButton(onClick = onRefreshSession) {
+                        Icon(Icons.Filled.Refresh, contentDescription = "Refresh session status")
                     }
                 },
             )
@@ -238,6 +269,7 @@ fun SettingsScreen(
                     fontWeight = FontWeight.Medium,
                 )
             }
+            WhatsAppSessionCard(session = whatsappSession, hostUrl = value.ifBlank { hostUrl })
             Text("Backend base URL (no trailing slash needed)")
             OutlinedTextField(
                 value = value,
@@ -262,6 +294,69 @@ fun SettingsScreen(
             Text(
                 "Press, then immediately go Home. If banner appears in 5s, notification channel works; FCM/MuMu may still be the issue.",
                 style = MaterialTheme.typography.bodySmall,
+            )
+        }
+    }
+}
+
+@Composable
+private fun WhatsAppSessionCard(session: WhatsAppSessionStatus, hostUrl: String) {
+    val okColor = Color(0xFF1B7F4A)
+    val badColor = Color(0xFFB3261E)
+    val checking = session.loading && session.status == null && session.error == null
+    val sessionOk = session.reachable && session.ok
+    val tint = if (checking) {
+        MaterialTheme.colorScheme.onSurfaceVariant
+    } else if (sessionOk) {
+        okColor
+    } else {
+        badColor
+    }
+    val headline = if (checking) {
+        "WhatsApp session"
+    } else if (sessionOk) {
+        "WhatsApp session: OK"
+    } else {
+        "WhatsApp session: not OK"
+    }
+    val detailText = when {
+        checking -> "Checking..."
+        !session.reachable || session.error != null -> session.error ?: "Backend unreachable"
+        sessionOk -> "Connected (open)"
+        session.status == "qr" || session.hasQr -> "Needs QR scan - open " + hostUrl.trimEnd('/') + "/qr"
+        session.status == "starting" -> "Starting... wait a moment"
+        session.status == "close" -> "Disconnected - reconnecting or needs QR"
+        else -> "Status: " + (session.status ?: "unknown")
+    }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(tint.copy(alpha = 0.10f))
+            .border(1.dp, tint.copy(alpha = 0.35f), RoundedCornerShape(12.dp))
+            .padding(14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        if (checking) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(22.dp),
+                strokeWidth = 2.dp,
+                color = tint,
+            )
+        } else {
+            Icon(
+                imageVector = if (sessionOk) Icons.Filled.CheckCircle else Icons.Filled.Close,
+                contentDescription = null,
+                tint = tint,
+            )
+        }
+        Column(modifier = Modifier.weight(1f)) {
+            Text(text = headline, fontWeight = FontWeight.SemiBold, color = tint)
+            Text(
+                text = detailText,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurface,
             )
         }
     }
@@ -362,7 +457,9 @@ fun MessagesScreen(
     onFolderChange: (InboxFolder) -> Unit,
     onToggleExpanded: (MatchedMessage) -> Unit,
     onToggleStar: (MatchedMessage) -> Unit,
+    onToggleThumbsUp: (MatchedMessage) -> Unit,
     onToggleDone: (MatchedMessage) -> Unit,
+    onMarkAllSeen: () -> Unit,
 ) {
     var searchExpanded by remember { mutableStateOf(false) }
     var filterMenuExpanded by remember { mutableStateOf(false) }
@@ -418,13 +515,8 @@ fun MessagesScreen(
                     tonalElevation = 1.dp,
                     shadowElevation = 0.dp,
                 ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(min = 44.dp)
-                            .padding(start = 6.dp, end = 2.dp, top = 2.dp, bottom = 2.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        // Row 1: folder chips or expanded search
                         if (searchExpanded) {
                             val searchBorder = MaterialTheme.colorScheme.outline.copy(alpha = 0.7f)
                             val searchText = MaterialTheme.colorScheme.onSurface
@@ -439,9 +531,9 @@ fun MessagesScreen(
                                 ),
                                 cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
                                 modifier = Modifier
-                                    .weight(1f)
+                                    .fillMaxWidth()
                                     .height(36.dp)
-                                    .padding(end = 4.dp),
+                                    .padding(horizontal = 6.dp, vertical = 4.dp),
                                 decorationBox = { inner ->
                                     Row(
                                         modifier = Modifier
@@ -487,8 +579,9 @@ fun MessagesScreen(
                         } else {
                             Row(
                                 modifier = Modifier
-                                    .weight(1f)
-                                    .horizontalScroll(rememberScrollState()),
+                                    .fillMaxWidth()
+                                    .horizontalScroll(rememberScrollState())
+                                    .padding(start = 6.dp, end = 6.dp, top = 4.dp, bottom = 2.dp),
                                 horizontalArrangement = Arrangement.spacedBy(4.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
@@ -506,7 +599,7 @@ fun MessagesScreen(
                                                     maxLines = 1,
                                                 )
                                                 if (unread > 0) {
-                                                    Spacer(Modifier.width(4.dp))
+                                                    Spacer(modifier = Modifier.width(4.dp))
                                                     Badge {
                                                         Text(
                                                             if (unread > 99) "99+" else unread.toString(),
@@ -521,96 +614,118 @@ fun MessagesScreen(
                             }
                         }
 
-                        Box {
+                        // Row 2: action icons
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(start = 2.dp, end = 2.dp, bottom = 2.dp),
+                            horizontalArrangement = Arrangement.End,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            val folderUnread = state.folderUnread[state.folder.apiValue] ?: 0
                             IconButton(
-                                onClick = { filterMenuExpanded = true },
+                                onClick = onMarkAllSeen,
+                                enabled = folderUnread > 0,
                                 modifier = Modifier.size(40.dp),
                             ) {
                                 Icon(
-                                    Icons.Default.FilterList,
-                                    contentDescription = "Filter",
+                                    Icons.Default.DoneAll,
+                                    contentDescription = "Mark all seen",
                                     modifier = Modifier.size(20.dp),
                                 )
                             }
-                            if (state.filter != InboxFilter.ALL) {
-                                Box(
-                                    modifier = Modifier
-                                        .align(Alignment.TopEnd)
-                                        .padding(top = 8.dp, end = 8.dp)
-                                        .size(7.dp)
-                                        .clip(CircleShape)
-                                        .background(MaterialTheme.colorScheme.primary),
-                                )
-                            }
-                            DropdownMenu(
-                                expanded = filterMenuExpanded,
-                                onDismissRequest = { filterMenuExpanded = false },
-                            ) {
-                                InboxFilter.entries.forEach { filter ->
-                                    DropdownMenuItem(
-                                        text = { Text(filterLabel(filter)) },
-                                        onClick = {
-                                            onFilterChange(filter)
-                                            filterMenuExpanded = false
-                                        },
-                                        trailingIcon = if (state.filter == filter) {
-                                            {
-                                                Icon(
-                                                    Icons.Default.CheckCircle,
-                                                    contentDescription = null,
-                                                    modifier = Modifier.size(16.dp),
-                                                )
-                                            }
-                                        } else {
-                                            null
-                                        },
+
+                            Box {
+                                IconButton(
+                                    onClick = { filterMenuExpanded = true },
+                                    modifier = Modifier.size(40.dp),
+                                ) {
+                                    Icon(
+                                        Icons.Default.FilterList,
+                                        contentDescription = "Filter",
+                                        modifier = Modifier.size(20.dp),
                                     )
                                 }
-                            }
-                        }
-
-                        IconButton(
-                            onClick = {
-                                if (searchExpanded) {
-                                    searchExpanded = false
-                                    if (state.searchQuery.isNotEmpty()) onSearchChange("")
-                                } else {
-                                    searchExpanded = true
+                                if (state.filter != InboxFilter.ALL) {
+                                    Box(
+                                        modifier = Modifier
+                                            .align(Alignment.TopEnd)
+                                            .padding(top = 8.dp, end = 8.dp)
+                                            .size(7.dp)
+                                            .clip(CircleShape)
+                                            .background(MaterialTheme.colorScheme.primary),
+                                    )
                                 }
-                            },
-                            modifier = Modifier.size(40.dp),
-                        ) {
-                            Icon(
-                                Icons.Default.Search,
-                                contentDescription = "Search",
-                                modifier = Modifier.size(20.dp),
-                                tint = if (searchExpanded || state.searchQuery.isNotEmpty()) {
-                                    MaterialTheme.colorScheme.primary
-                                } else {
-                                    LocalContentColor.current
+                                DropdownMenu(
+                                    expanded = filterMenuExpanded,
+                                    onDismissRequest = { filterMenuExpanded = false },
+                                ) {
+                                    InboxFilter.entries.forEach { filter ->
+                                        DropdownMenuItem(
+                                            text = { Text(filterLabel(filter)) },
+                                            onClick = {
+                                                onFilterChange(filter)
+                                                filterMenuExpanded = false
+                                            },
+                                            trailingIcon = if (state.filter == filter) {
+                                                {
+                                                    Icon(
+                                                        Icons.Default.CheckCircle,
+                                                        contentDescription = null,
+                                                        modifier = Modifier.size(16.dp),
+                                                    )
+                                                }
+                                            } else {
+                                                null
+                                            },
+                                        )
+                                    }
+                                }
+                            }
+
+                            IconButton(
+                                onClick = {
+                                    if (searchExpanded) {
+                                        searchExpanded = false
+                                        if (state.searchQuery.isNotEmpty()) onSearchChange("")
+                                    } else {
+                                        searchExpanded = true
+                                    }
                                 },
-                            )
-                        }
-                        IconButton(onClick = onRefresh, modifier = Modifier.size(40.dp)) {
-                            Icon(
-                                Icons.Default.Refresh,
-                                contentDescription = "Refresh",
-                                modifier = Modifier.size(20.dp),
-                            )
-                        }
-                        IconButton(onClick = onOpenSettings, modifier = Modifier.size(40.dp)) {
-                            Icon(
-                                Icons.Default.Settings,
-                                contentDescription = "Settings",
-                                modifier = Modifier.size(20.dp),
-                            )
-                        }
-                        IconButton(onClick = onLogout, modifier = Modifier.size(40.dp)) {
-                            Icon(
-                                Icons.AutoMirrored.Filled.Logout,
-                                contentDescription = "Logout",
-                                modifier = Modifier.size(20.dp),
-                            )
+                                modifier = Modifier.size(40.dp),
+                            ) {
+                                Icon(
+                                    Icons.Default.Search,
+                                    contentDescription = "Search",
+                                    modifier = Modifier.size(20.dp),
+                                    tint = if (searchExpanded || state.searchQuery.isNotEmpty()) {
+                                        MaterialTheme.colorScheme.primary
+                                    } else {
+                                        LocalContentColor.current
+                                    },
+                                )
+                            }
+                            IconButton(onClick = onRefresh, modifier = Modifier.size(40.dp)) {
+                                Icon(
+                                    Icons.Default.Refresh,
+                                    contentDescription = "Refresh",
+                                    modifier = Modifier.size(20.dp),
+                                )
+                            }
+                            IconButton(onClick = onOpenSettings, modifier = Modifier.size(40.dp)) {
+                                Icon(
+                                    Icons.Default.Settings,
+                                    contentDescription = "Settings",
+                                    modifier = Modifier.size(20.dp),
+                                )
+                            }
+                            IconButton(onClick = onLogout, modifier = Modifier.size(40.dp)) {
+                                Icon(
+                                    Icons.AutoMirrored.Filled.Logout,
+                                    contentDescription = "Logout",
+                                    modifier = Modifier.size(20.dp),
+                                )
+                            }
                         }
                     }
                 }
@@ -640,8 +755,9 @@ fun MessagesScreen(
                                 expanded = state.expandedId == rowId,
                                 onToggleExpanded = { onToggleExpanded(msg) },
                                 onToggleStar = { onToggleStar(msg) },
+                                onToggleThumbsUp = { onToggleThumbsUp(msg) },
                                 onToggleDone = { onToggleDone(msg) },
-                                onOpenWhatsApp = { onOpenWhatsApp(msg.waLink) },
+                                onOpenWhatsApp = { onOpenWhatsApp(buildWaMeUrl(msg.waLink, msg.text)) },
                             )
                             HorizontalDivider()
                         }
@@ -694,6 +810,7 @@ private fun MessageRow(
     expanded: Boolean,
     onToggleExpanded: () -> Unit,
     onToggleStar: () -> Unit,
+    onToggleThumbsUp: () -> Unit,
     onToggleDone: () -> Unit,
     onOpenWhatsApp: () -> Unit,
 ) {
@@ -769,6 +886,14 @@ private fun MessageRow(
                                 tint = MaterialTheme.colorScheme.primary,
                             )
                         }
+                        if (msg.thumbsUp) {
+                            Icon(
+                                Icons.Default.ThumbUp,
+                                contentDescription = "Thumbs up",
+                                modifier = Modifier.size(18.dp),
+                                tint = MaterialTheme.colorScheme.primary,
+                            )
+                        }
                         if (msg.done) {
                             Icon(
                                 Icons.Default.CheckCircle,
@@ -803,6 +928,14 @@ private fun MessageRow(
                             else MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
+                    IconButton(onClick = onToggleThumbsUp) {
+                        Icon(
+                            if (msg.thumbsUp) Icons.Default.ThumbUp else Icons.Outlined.ThumbUp,
+                            contentDescription = if (msg.thumbsUp) "Remove thumbs up" else "Thumbs up",
+                            tint = if (msg.thumbsUp) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                     IconButton(onClick = onToggleDone) {
                         Icon(
                             if (msg.done) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,
@@ -826,7 +959,9 @@ private fun MessageRow(
 private fun displaySender(msg: MatchedMessage): String {
     val name = msg.senderName?.trim()?.takeUnless { it.isEmpty() || it == "null" }
     val phone = msg.senderPhone?.trim()?.takeUnless { it.isEmpty() || it == "null" }
-    return name ?: phone ?: "Unknown"
+    val sender = name ?: phone ?: "Unknown"
+    val group = msg.groupName?.trim()?.takeUnless { it.isEmpty() || it == "null" }
+    return if (msg.isGroup && !group.isNullOrBlank()) "$sender · $group" else sender
 }
 
 private fun isValidWaLink(link: String?): Boolean {
@@ -834,10 +969,24 @@ private fun isValidWaLink(link: String?): Boolean {
     return url.startsWith("https://wa.me/") && url.length > "https://wa.me/".length
 }
 
+/** Prefills WhatsApp compose with order text (`?text=`). No intro. */
+private fun buildWaMeUrl(waLink: String?, text: String?): String? {
+    if (!isValidWaLink(waLink)) return null
+    val base = waLink!!.trim().substringBefore("?")
+    val body = text?.trim().orEmpty()
+    if (body.isEmpty()) return base
+    val truncated = if (body.length > WA_TEXT_MAX_CHARS) body.take(WA_TEXT_MAX_CHARS) else body
+    val encoded = URLEncoder.encode(truncated, StandardCharsets.UTF_8.name()).replace("+", "%20")
+    return "$base?text=$encoded"
+}
+
+private const val WA_TEXT_MAX_CHARS = 1500
+
 private fun filterLabel(filter: InboxFilter): String = when (filter) {
     InboxFilter.ALL -> "All"
     InboxFilter.UNREAD -> "Unread"
     InboxFilter.STARRED -> "Starred"
+    InboxFilter.THUMBS_UP -> "Thumbs up"
     InboxFilter.DONE -> "Done"
     InboxFilter.GROUPS -> "Groups"
 }

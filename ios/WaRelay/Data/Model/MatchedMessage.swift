@@ -6,6 +6,7 @@ struct MatchedMessage: Identifiable, Equatable, Sendable {
     let text: String
     let senderPhone: String?
     let senderName: String?
+    let groupName: String?
     let chatId: String
     let isGroup: Bool
     let waLink: String?
@@ -16,10 +17,19 @@ struct MatchedMessage: Identifiable, Equatable, Sendable {
     let readAt: String?
     let starred: Bool
     let done: Bool
+    let thumbsUp: Bool
 
     var isUnread: Bool { readAt?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true }
 
     var rowId: String { id.isEmpty ? messageId : id }
+
+    var displaySender: String {
+        let sender = senderName ?? senderPhone ?? "Unknown"
+        if isGroup, let group = groupName?.trimmingCharacters(in: .whitespacesAndNewlines), !group.isEmpty {
+            return "\(sender) · \(group)"
+        }
+        return sender
+    }
 
     init(
         id: String,
@@ -27,6 +37,7 @@ struct MatchedMessage: Identifiable, Equatable, Sendable {
         text: String,
         senderPhone: String?,
         senderName: String?,
+        groupName: String?,
         chatId: String,
         isGroup: Bool,
         waLink: String?,
@@ -36,13 +47,15 @@ struct MatchedMessage: Identifiable, Equatable, Sendable {
         createdAt: String?,
         readAt: String?,
         starred: Bool,
-        done: Bool
+        done: Bool,
+        thumbsUp: Bool
     ) {
         self.id = id
         self.messageId = messageId
         self.text = text
         self.senderPhone = senderPhone
         self.senderName = senderName
+        self.groupName = groupName
         self.chatId = chatId
         self.isGroup = isGroup
         self.waLink = waLink
@@ -53,6 +66,7 @@ struct MatchedMessage: Identifiable, Equatable, Sendable {
         self.readAt = readAt
         self.starred = starred
         self.done = done
+        self.thumbsUp = thumbsUp
     }
 
     init(json: [String: Any]) {
@@ -61,6 +75,7 @@ struct MatchedMessage: Identifiable, Equatable, Sendable {
         text = Self.string(json["text"]) ?? ""
         senderPhone = Self.nullableString(json["senderPhone"])
         senderName = Self.nullableString(json["senderName"])
+        groupName = Self.nullableString(json["groupName"])
         chatId = Self.string(json["chatId"]) ?? ""
         isGroup = Self.bool(json["isGroup"])
         waLink = Self.nullableString(json["waLink"])
@@ -71,15 +86,23 @@ struct MatchedMessage: Identifiable, Equatable, Sendable {
         readAt = Self.nullableString(json["readAt"])
         starred = Self.bool(json["starred"])
         done = Self.bool(json["done"])
+        thumbsUp = Self.bool(json["thumbsUp"])
     }
 
-    func updating(readAt: String? = nil, clearReadAt: Bool = false, starred: Bool? = nil, done: Bool? = nil) -> MatchedMessage {
+    func updating(
+        readAt: String? = nil,
+        clearReadAt: Bool = false,
+        starred: Bool? = nil,
+        done: Bool? = nil,
+        thumbsUp: Bool? = nil
+    ) -> MatchedMessage {
         MatchedMessage(
             id: id,
             messageId: messageId,
             text: text,
             senderPhone: senderPhone,
             senderName: senderName,
+            groupName: groupName,
             chatId: chatId,
             isGroup: isGroup,
             waLink: waLink,
@@ -89,7 +112,8 @@ struct MatchedMessage: Identifiable, Equatable, Sendable {
             createdAt: createdAt,
             readAt: clearReadAt ? nil : (readAt ?? self.readAt),
             starred: starred ?? self.starred,
-            done: done ?? self.done
+            done: done ?? self.done,
+            thumbsUp: thumbsUp ?? self.thumbsUp
         )
     }
 

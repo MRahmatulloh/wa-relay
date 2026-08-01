@@ -24,6 +24,12 @@ struct AuthView: View {
             }
             .padding(.horizontal)
 
+            Text("Server: \(vm.hostURL)")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal)
+
             if let error = vm.error {
                 Text(error)
                     .font(.footnote)

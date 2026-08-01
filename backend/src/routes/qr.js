@@ -30,6 +30,10 @@ router.get('/', (req, res) => {
 <body style="font-family:sans-serif;text-align:center;padding:2rem">
   <h1>Waiting for QR…</h1>
   <p>Status: ${escapeHtml(status)}. This page refreshes automatically.</p>
+  <p style="color:#666;max-width:28rem;margin:1rem auto">
+    If this stays on <code>close</code> for more than ~15s, the WhatsApp session was logged out
+    and is being reset — wait for the QR image, or restart the backend container.
+  </p>
 </body></html>`);
   }
   return res.type('html').send(`<!doctype html>
@@ -42,7 +46,14 @@ router.get('/', (req, res) => {
 });
 
 router.get('/status', (req, res) => {
-  res.json({ status: getConnectionStatus(), hasQr: Boolean(getQrDataUrl()) });
+  const status = getConnectionStatus();
+  const connected = status === 'open';
+  res.json({
+    status,
+    ok: connected,
+    connected,
+    hasQr: Boolean(getQrDataUrl()),
+  });
 });
 
 function escapeHtml(value) {

@@ -63,7 +63,9 @@ class MainActivity : ComponentActivity() {
                     onFolderChange = vm::setFolder,
                     onToggleExpanded = vm::toggleExpanded,
                     onToggleStar = vm::toggleStar,
+                    onToggleThumbsUp = vm::toggleThumbsUp,
                     onToggleDone = vm::toggleDone,
+                    onMarkAllSeen = vm::markAllSeen,
                     onTestLocalNotification = {
                         Handler(Looper.getMainLooper()).postDelayed({
                             NotificationHelper.show(
@@ -73,6 +75,9 @@ class MainActivity : ComponentActivity() {
                             )
                         }, 5000L)
                     },
+                    onStartSessionPolling = vm::startWhatsAppSessionPolling,
+                    onStopSessionPolling = vm::stopWhatsAppSessionPolling,
+                    onRefreshSession = vm::refreshWhatsAppSession,
                 )
             }
         }

@@ -19,6 +19,9 @@
 		A1000000000000000000000A /* MessagesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000A /* MessagesView.swift */; };
 		A1000000000000000000000B /* PushManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000B /* PushManager.swift */; };
 		A1000000000000000000000C /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000C /* Assets.xcassets */; };
+		A1000000000000000000000D /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = A30000000000000000000001 /* FirebaseCore */; };
+		A1000000000000000000000E /* FirebaseMessaging in Frameworks */ = {isa = PBXBuildFile; productRef = A30000000000000000000002 /* FirebaseMessaging */; };
+		A1000000000000000000000F /* SocketIO in Frameworks */ = {isa = PBXBuildFile; productRef = A30000000000000000000003 /* SocketIO */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -44,6 +47,9 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A1000000000000000000000D /* FirebaseCore in Frameworks */,
+				A1000000000000000000000E /* FirebaseMessaging in Frameworks */,
+				A1000000000000000000000F /* SocketIO in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -184,6 +190,9 @@
 			);
 			name = WaRelay;
 			packageProductDependencies = (
+				A30000000000000000000001 /* FirebaseCore */,
+				A30000000000000000000002 /* FirebaseMessaging */,
+				A30000000000000000000003 /* SocketIO */,
 			);
 			productName = WaRelay;
 			productReference = A2000000000000000000000F /* WaRelay.app */;
@@ -214,6 +223,8 @@
 			);
 			mainGroup = A50000000000000000000001;
 			packageReferences = (
+				A90000000000000000000001 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
+				A90000000000000000000002 /* XCRemoteSwiftPackageReference "socket.io-client-swift" */,
 			);
 			productRefGroup = A50000000000000000000003 /* Products */;
 			projectDirPath = "";
@@ -299,7 +310,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = WaRelay/WaRelay.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_TEAM = "";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -309,7 +320,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0.0;
+				MARKETING_VERSION = 1.0.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.warelay.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
@@ -327,7 +338,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = WaRelay/WaRelay.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_TEAM = "";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -337,7 +348,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0.0;
+				MARKETING_VERSION = 1.0.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.warelay.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
@@ -372,6 +383,42 @@
 		};
 /* End XCConfigurationList section */
 
+/* Begin XCRemoteSwiftPackageReference section */
+		A90000000000000000000001 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/firebase/firebase-ios-sdk";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 11.0.0;
+			};
+		};
+		A90000000000000000000002 /* XCRemoteSwiftPackageReference "socket.io-client-swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/socketio/socket.io-client-swift";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 16.1.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		A30000000000000000000001 /* FirebaseCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A90000000000000000000001 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseCore;
+		};
+		A30000000000000000000002 /* FirebaseMessaging */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A90000000000000000000001 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseMessaging;
+		};
+		A30000000000000000000003 /* SocketIO */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A90000000000000000000002 /* XCRemoteSwiftPackageReference "socket.io-client-swift" */;
+			productName = SocketIO;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = A80000000000000000000001 /* Project object */;
 }

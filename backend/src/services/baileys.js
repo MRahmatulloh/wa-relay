@@ -6,6 +6,7 @@ import makeWASocket, {
 } from '@whiskeysockets/baileys';
 import { Boom } from '@hapi/boom';
 import fs from 'fs';
+import path from 'path';
 import pino from 'pino';
 import QRCode from 'qrcode';
 import { config } from '../config.js';
@@ -17,6 +18,10 @@ let sock = null;
 let latestQrDataUrl = null;
 let connectionStatus = 'starting';
 let broadcastFn = null;
+
+/** chatId -> { name, expires } */
+const groupNameCache = new Map();
+const GROUP_NAME_TTL_MS = 30 * 60 * 1000;
 
 const logger = pino({ level: 'silent' });
 
@@ -67,9 +72,24 @@ function extractText(msg) {
   return null;
 }
 
+async function resolveGroupName(chatId) {
+  if (!chatId?.endsWith('@g.us') || !sock) return null;
+  const cached = groupNameCache.get(chatId);
+  if (cached && cached.expires > Date.now()) return cached.name;
+  try {
+    const meta = await sock.groupMetadata(chatId);
+    const name = meta?.subject?.trim() || null;
+    groupNameCache.set(chatId, { name, expires: Date.now() + GROUP_NAME_TTL_MS });
+    return name;
+  } catch (err) {
+    console.error('groupMetadata error', err.message);
+    return cached?.name || null;
+  }
+}
+
 async function handleIncoming(msg) {
   if (!msg.message || msg.key.fromMe) return;
-  const text = extractText(msg);
+  const text = extractText(msg)?.trim();
   if (!text) return;
 
   const match = matchPattern(text);
@@ -84,9 +104,31 @@ async function handleIncoming(msg) {
   }
   const senderPhone = resolveSenderPhone(msg, senderJid, isGroup);
   const senderName = msg.pushName || null;
+  const groupName = isGroup ? await resolveGroupName(chatId) : null;
   const messageId = msg.key.id || `${chatId}-${msg.messageTimestamp}`;
+  const participantJid = isGroup && msg.key.participant ? msg.key.participant : null;
   const waLink = senderPhone ? `https://wa.me/${senderPhone}` : null;
   const timestamp = new Date(Number(msg.messageTimestamp) * 1000 || Date.now());
+
+  if (config.dedupeWindowMs > 0) {
+    const windowStart = new Date(Date.now() - config.dedupeWindowMs);
+    const senderFilter = senderPhone
+      ? { senderPhone }
+      : isGroup && participantJid
+        ? { participantJid }
+        : { chatId, isGroup: false };
+    const dup = await Message.findOne({
+      text,
+      ...senderFilter,
+      timestamp: { $gte: windowStart },
+    })
+      .select({ _id: 1 })
+      .lean();
+    if (dup) {
+      console.log('skip duplicate message', { messageId, senderPhone, chatId });
+      return;
+    }
+  }
 
   let saved;
   try {
@@ -97,8 +139,10 @@ async function handleIncoming(msg) {
         text,
         senderPhone,
         senderName,
+        groupName,
         chatId,
         isGroup,
+        participantJid,
         waLink,
         matchedPattern,
         folder,
@@ -117,7 +161,64 @@ async function handleIncoming(msg) {
   sendMatchedPush(payload).catch((err) => console.error('FCM send error', err.message));
 }
 
+/**
+ * Send or remove a 👍 reaction on the original WhatsApp message.
+ * @param {{ chatId: string, messageId: string, isGroup?: boolean, participantJid?: string|null }} msg
+ * @param {boolean} enabled
+ */
+export async function sendThumbsUpReaction(msg, enabled) {
+  if (!sock || connectionStatus !== 'open') {
+    throw new Error('WhatsApp is not connected');
+  }
+  const chatId = msg.chatId;
+  const messageId = msg.messageId;
+  if (!chatId || !messageId) {
+    throw new Error('Missing chatId or messageId');
+  }
+  const key = {
+    remoteJid: chatId,
+    id: messageId,
+    fromMe: false,
+  };
+  if (msg.isGroup && msg.participantJid) {
+    key.participant = msg.participantJid;
+  } else if (msg.isGroup) {
+    throw new Error('Missing participantJid for group reaction');
+  }
+  await sock.sendMessage(chatId, {
+    react: {
+      text: enabled ? '👍' : '',
+      key,
+    },
+  });
+}
+
+function clearAuthDir() {
+  try {
+    // Docker mounts baileys_auth as a volume — remove contents, not the mountpoint.
+    fs.mkdirSync(config.baileysAuthDir, { recursive: true });
+    for (const name of fs.readdirSync(config.baileysAuthDir)) {
+      fs.rmSync(path.join(config.baileysAuthDir, name), { recursive: true, force: true });
+    }
+    console.log('Cleared baileys_auth — will request a new QR');
+  } catch (err) {
+    console.error('Failed to clear baileys auth', err.message);
+  }
+}
+
+function endSocket() {
+  if (!sock) return;
+  try {
+    sock.ev.removeAllListeners();
+    sock.end(undefined);
+  } catch {
+    // ignore teardown errors
+  }
+  sock = null;
+}
+
 export async function startBaileys() {
+  endSocket();
   fs.mkdirSync(config.baileysAuthDir, { recursive: true });
   const { state, saveCreds } = await useMultiFileAuthState(config.baileysAuthDir);
   const { version } = await fetchLatestBaileysVersion();
@@ -150,14 +251,15 @@ export async function startBaileys() {
     }
     if (connection === 'close') {
       connectionStatus = 'close';
+      latestQrDataUrl = null;
       const statusCode = new Boom(lastDisconnect?.error)?.output?.statusCode;
-      const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
-      console.log('WhatsApp closed', statusCode, 'reconnect=', shouldReconnect);
-      if (shouldReconnect) {
-        setTimeout(() => startBaileys().catch(console.error), 3000);
-      } else {
-        console.log('Logged out — delete baileys_auth volume and restart to scan QR again');
+      const loggedOut = statusCode === DisconnectReason.loggedOut;
+      console.log('WhatsApp closed', statusCode, 'loggedOut=', loggedOut);
+      if (loggedOut) {
+        // Stale creds never emit a QR — wipe session and start fresh.
+        clearAuthDir();
       }
+      setTimeout(() => startBaileys().catch(console.error), loggedOut ? 1000 : 3000);
     }
   });
 
@@ -168,6 +270,19 @@ export async function startBaileys() {
         await handleIncoming(msg);
       } catch (err) {
         console.error('message handle error', err);
+      }
+    }
+  });
+
+  sock.ev.on('groups.update', (updates) => {
+    for (const u of updates || []) {
+      const id = u?.id;
+      if (!id?.endsWith('@g.us')) continue;
+      if (typeof u.subject === 'string' && u.subject.trim()) {
+        groupNameCache.set(id, {
+          name: u.subject.trim(),
+          expires: Date.now() + GROUP_NAME_TTL_MS,
+        });
       }
     }
   });

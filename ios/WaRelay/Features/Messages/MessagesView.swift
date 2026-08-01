@@ -50,8 +50,9 @@ struct MessagesView: View {
                                     expanded: vm.expandedId == msg.rowId,
                                     onToggle: { vm.toggleExpanded(msg) },
                                     onStar: { vm.toggleStar(msg) },
+                                    onThumbsUp: { vm.toggleThumbsUp(msg) },
                                     onDone: { vm.toggleDone(msg) },
-                                    onOpenWhatsApp: { vm.openWhatsApp(msg.waLink) }
+                                    onOpenWhatsApp: { vm.openWhatsApp(msg.waLink, text: msg.text) }
                                 )
                                 .id(msg.rowId)
                                 .onAppear {
@@ -110,6 +111,11 @@ struct MessagesView: View {
                 }
             }
             ToolbarItemGroup(placement: .topBarTrailing) {
+                Button { vm.markAllSeen() } label: {
+                    Image(systemName: "text.badge.checkmark")
+                }
+                .disabled((vm.folderUnread[vm.folder.apiValue] ?? 0) <= 0)
+                .accessibilityLabel("Mark all seen")
                 Button {
                     showSearch.toggle()
                 } label: {
@@ -168,6 +174,7 @@ private struct MessageRow: View {
     let expanded: Bool
     let onToggle: () -> Void
     let onStar: () -> Void
+    let onThumbsUp: () -> Void
     let onDone: () -> Void
     let onOpenWhatsApp: () -> Void
 
@@ -182,7 +189,7 @@ private struct MessageRow: View {
                 }
                 VStack(alignment: .leading, spacing: 4) {
                     HStack {
-                        Text(message.senderName ?? message.senderPhone ?? "Unknown")
+                        Text(message.displaySender)
                             .font(.headline)
                             .lineLimit(1)
                         Spacer()
@@ -195,6 +202,11 @@ private struct MessageRow: View {
                             Image(systemName: "star.fill")
                                 .font(.caption)
                                 .foregroundStyle(.yellow)
+                        }
+                        if message.thumbsUp {
+                            Image(systemName: "hand.thumbsup.fill")
+                                .font(.caption)
+                                .foregroundStyle(Color.accentColor)
                         }
                         if message.done {
                             Image(systemName: "checkmark.circle.fill")
@@ -218,6 +230,12 @@ private struct MessageRow: View {
                         Label(
                             message.starred ? "Unstar" : "Star",
                             systemImage: message.starred ? "star.fill" : "star"
+                        )
+                    }
+                    Button(action: onThumbsUp) {
+                        Label(
+                            message.thumbsUp ? "Remove 👍" : "Thumbs up",
+                            systemImage: message.thumbsUp ? "hand.thumbsup.fill" : "hand.thumbsup"
                         )
                     }
                     Button(action: onDone) {

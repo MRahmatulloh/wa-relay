@@ -1,6 +1,7 @@
 package com.warelay.app.data.remote
 
 import com.warelay.app.data.model.MatchedMessage
+import com.warelay.app.data.model.TransferJob
 import com.warelay.app.data.prefs.UserPreferences
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -256,6 +257,9 @@ class ApiClient(private val preferences: UserPreferences) {
                 waLink = optNullableString(obj, "waLink"),
                 matchedPattern = optNullableString(obj, "matchedPattern"),
                 folder = optNullableString(obj, "folder"),
+                jobs = parseJobs(obj.optJSONArray("jobs")),
+                parseStatus = optNullableString(obj, "parseStatus"),
+                parseSource = optNullableString(obj, "parseSource"),
                 timestamp = optNullableString(obj, "timestamp"),
                 createdAt = optNullableString(obj, "createdAt"),
                 readAt = optNullableString(obj, "readAt"),
@@ -263,6 +267,22 @@ class ApiClient(private val preferences: UserPreferences) {
                 done = obj.optBoolean("done", false),
                 thumbsUp = obj.optBoolean("thumbsUp", false),
             )
+
+        private fun parseJobs(arr: JSONArray?): List<TransferJob> {
+            if (arr == null) return emptyList()
+            val list = mutableListOf<TransferJob>()
+            for (i in 0 until arr.length()) {
+                val o = arr.optJSONObject(i) ?: continue
+                val price = if (o.has("price") && !o.isNull("price")) o.optDouble("price") else null
+                list += TransferJob(
+                    from = optNullableString(o, "from"),
+                    to = optNullableString(o, "to"),
+                    price = price,
+                    currency = optNullableString(o, "currency") ?: "GBP",
+                )
+            }
+            return list
+        }
 
         /**
          * JSONObject.optString returns the literal "null" for JSON null — treat that as absent.

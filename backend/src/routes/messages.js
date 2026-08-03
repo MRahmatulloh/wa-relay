@@ -38,6 +38,9 @@ function buildListFilter(query) {
     filter.folder = folder;
   }
 
+  const parseStatus = String(query.parseStatus || '').trim().toLowerCase();
+  if (parseStatus) filter.parseStatus = parseStatus;
+
   const q = String(query.q || '').trim();
   if (q) {
     const re = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
@@ -47,6 +50,8 @@ function buildListFilter(query) {
       { senderPhone: re },
       { groupName: re },
       { matchedPattern: re },
+      { 'jobs.from': re },
+      { 'jobs.to': re },
     ];
   }
 

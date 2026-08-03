@@ -12,6 +12,7 @@ import QRCode from 'qrcode';
 import { config } from '../config.js';
 import { Message, serializeMessage } from '../models/Message.js';
 import { matchPattern } from './patterns.js';
+import { extractJobs } from './jobExtract.js';
 import { sendMatchedPush } from './fcm.js';
 
 let sock = null;
@@ -130,6 +131,8 @@ async function handleIncoming(msg) {
     }
   }
 
+  const extracted = await extractJobs(text);
+
   let saved;
   try {
     saved = await Message.findOneAndUpdate(
@@ -146,6 +149,9 @@ async function handleIncoming(msg) {
         waLink,
         matchedPattern,
         folder,
+        jobs: extracted.jobs,
+        parseStatus: extracted.parseStatus,
+        parseSource: extracted.parseSource,
         timestamp,
       },
       { upsert: true, new: true, setDefaultsOnInsert: true }

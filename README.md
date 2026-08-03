@@ -1,6 +1,8 @@
 # wa-relay
 
-WhatsApp (Baileys) → Node backend (MongoDB, Docker) → Android APK / iOS app (FCM + Socket.io).
+WhatsApp (Baileys) → Node backend (MongoDB, Docker) → Android APK / iOS / **web admin** (FCM + Socket.io).
+
+Incoming matches are parsed for transfer **from / to / price** (`jobs`) via local rules + optional Flan-T5 model (`ml/`).
 
 **Warning:** Baileys is unofficial and may violate WhatsApp ToS. Do not use your primary phone number.
 
@@ -13,9 +15,46 @@ docker compose up --build
 ```
 
 - API: http://localhost:4500
+- Web admin: http://localhost:5173
+- Job extract model: http://localhost:8000/health
 - QR login: http://localhost:4500/qr (HTTP Basic Auth by default — same username/password as app users; set `QR_BASIC_AUTH=false` to disable)
 - Health: http://localhost:4500/health
 - MongoDB (auth): `localhost:27018` — URI like `mongodb://wa_relay:<password>@HOST:27018/wa-relay?authSource=admin`
+
+### Job extract (from / to / price)
+
+1. Export silver dataset from a Mongo dump or live DB:
+
+```bash
+cd backend
+npm run dataset:export -- --in ../../messages.json --out ../ml/data
+# or: npm run dataset:export -- --mongo --out ../ml/data
+```
+
+2. Train + eval (see [`ml/README.md`](ml/README.md)):
+
+```bash
+cd ml
+python -m venv .venv
+.venv\Scripts\activate
+pip install -r requirements.txt
+python train.py --train data/train.jsonl --val data/val.jsonl --out artifacts/model
+```
+
+3. **Live extract order:** `GEMINI_API_KEY` (Gemini Flash) → `OWN_MODEL_URL` (local Flan-T5) → `rules_v1`.  
+   Google AI Pro subscription does **not** replace an AI Studio API key — set `GEMINI_API_KEY` in `.env`.
+
+4. Backfill existing rows: `npm run jobs:backfill` (add `--force` to rewrite all).
+
+### Web admin (local)
+
+```bash
+cd web
+npm install
+npm run dev
+```
+
+Login with the same JWT user as the apps. Empty API host = Vite proxy to `:4500`.
 
 `MONGO_INITDB_*` credentials apply only on a **fresh** Mongo volume. If `mongo_data` already exists without auth, recreate it (`docker compose down` then remove the volume) before enabling auth.
 

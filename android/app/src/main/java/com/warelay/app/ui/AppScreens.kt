@@ -903,6 +903,16 @@ private fun MessageRow(
                             )
                         }
                     }
+                    msg.jobsSummary?.let { summary ->
+                        Text(
+                            text = summary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
                     Text(
                         text = msg.text,
                         maxLines = if (expanded) Int.MAX_VALUE else 2,

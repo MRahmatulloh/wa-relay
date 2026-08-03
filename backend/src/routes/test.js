@@ -3,6 +3,7 @@ import { Message, serializeMessage } from '../models/Message.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { sendMatchedPush } from '../services/fcm.js';
 import { matchPattern } from '../services/patterns.js';
+import { extractJobs } from '../services/jobExtract.js';
 
 /** Dev/helper: inject a matched message (simulates Baileys pattern hit). */
 export function createTestRoutes(broadcastMatched) {
@@ -19,6 +20,7 @@ export function createTestRoutes(broadcastMatched) {
         matchedPattern: 'test-inject',
         folder: String(req.body.folder || 'others'),
       };
+      const extracted = await extractJobs(text);
       const saved = await Message.create({
         messageId,
         text,
@@ -29,6 +31,9 @@ export function createTestRoutes(broadcastMatched) {
         waLink,
         matchedPattern: match.matchedPattern,
         folder: match.folder,
+        jobs: extracted.jobs,
+        parseStatus: extracted.parseStatus,
+        parseSource: extracted.parseSource,
         timestamp: new Date(),
       });
       const payload = serializeMessage(saved);

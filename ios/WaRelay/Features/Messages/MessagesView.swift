@@ -201,7 +201,7 @@ private struct MessageRow: View {
                         if message.starred {
                             Image(systemName: "star.fill")
                                 .font(.caption)
-                                .foregroundStyle(.yellow)
+                                .foregroundStyle(Color.accentColor)
                         }
                         if message.thumbsUp {
                             Image(systemName: "hand.thumbsup.fill")
@@ -211,8 +211,14 @@ private struct MessageRow: View {
                         if message.done {
                             Image(systemName: "checkmark.circle.fill")
                                 .font(.caption)
-                                .foregroundStyle(.green)
+                                .foregroundStyle(.secondary)
                         }
+                    }
+                    if let jobs = message.jobsSummary {
+                        Text(jobs)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(Color.accentColor)
+                            .lineLimit(1)
                     }
                     Text(message.text)
                         .font(.subheadline)
@@ -225,33 +231,37 @@ private struct MessageRow: View {
             }
 
             if expanded {
-                HStack(spacing: 16) {
+                HStack(spacing: 4) {
+                    Spacer(minLength: 0)
                     Button(action: onStar) {
-                        Label(
-                            message.starred ? "Unstar" : "Star",
-                            systemImage: message.starred ? "star.fill" : "star"
-                        )
+                        Image(systemName: message.starred ? "star.fill" : "star")
+                            .foregroundStyle(message.starred ? Color.accentColor : Color.secondary)
                     }
+                    .accessibilityLabel(message.starred ? "Unstar" : "Star")
+
                     Button(action: onThumbsUp) {
-                        Label(
-                            message.thumbsUp ? "Remove 👍" : "Thumbs up",
-                            systemImage: message.thumbsUp ? "hand.thumbsup.fill" : "hand.thumbsup"
-                        )
+                        Image(systemName: message.thumbsUp ? "hand.thumbsup.fill" : "hand.thumbsup")
+                            .foregroundStyle(message.thumbsUp ? Color.accentColor : Color.secondary)
                     }
+                    .accessibilityLabel(message.thumbsUp ? "Remove thumbs up" : "Thumbs up")
+
                     Button(action: onDone) {
-                        Label(
-                            message.done ? "Undone" : "Done",
-                            systemImage: message.done ? "checkmark.circle.fill" : "circle"
-                        )
+                        Image(systemName: message.done ? "checkmark.circle.fill" : "circle")
+                            .foregroundStyle(message.done ? Color.accentColor : Color.secondary)
                     }
+                    .accessibilityLabel(message.done ? "Undone" : "Done")
+
                     if message.waLink != nil {
                         Button(action: onOpenWhatsApp) {
-                            Label("WhatsApp", systemImage: "arrow.up.right.square")
+                            Image(systemName: "arrow.up.right.square")
+                                .foregroundStyle(Color.secondary)
                         }
+                        .accessibilityLabel("WhatsApp")
                     }
                 }
-                .font(.caption)
-                .buttonStyle(.bordered)
+                .font(.body)
+                .buttonStyle(.borderless)
+                .padding(.top, 4)
             }
         }
         .padding(.vertical, 4)

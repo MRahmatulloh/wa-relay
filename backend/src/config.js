@@ -17,6 +17,13 @@ export const config = {
   patternsFile: process.env.PATTERNS_FILE || path.join(__dirname, '..', 'config', 'patterns.json'),
   /** Skip same sender+text within this window (ms). Default 10 minutes. */
   dedupeWindowMs: Math.max(0, Number(process.env.DEDUPE_WINDOW_MS) || 10 * 60 * 1000),
+  /** Local job-extract model (FastAPI). Empty = skip. */
+  ownModelUrl: String(process.env.OWN_MODEL_URL || '').trim(),
+  ownModelTimeoutMs: Math.max(200, Number(process.env.OWN_MODEL_TIMEOUT_MS) || 2500),
+  /** Gemini API (AI Studio key). Preferred over local model when set. */
+  geminiApiKey: String(process.env.GEMINI_API_KEY || '').trim(),
+  geminiModel: String(process.env.GEMINI_MODEL || 'gemini-2.0-flash').trim(),
+  geminiTimeoutMs: Math.max(500, Number(process.env.GEMINI_TIMEOUT_MS) || 8000),
   /** QR page HTTP Basic Auth. Default on; set QR_BASIC_AUTH=false to disable. */
   qrBasicAuth: !['0', 'false', 'no', 'off'].includes(
     String(process.env.QR_BASIC_AUTH ?? 'true').toLowerCase(),

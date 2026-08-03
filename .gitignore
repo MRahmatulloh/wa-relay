@@ -13,3 +13,9 @@ android/local.properties
 android/app/google-services.json
 .tools/
 mongo_data/
+ml/.venv/
+ml/artifacts/
+ml/data/
+web/node_modules/
+web/dist/
+

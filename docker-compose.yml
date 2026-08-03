@@ -22,6 +22,18 @@ services:
       retries: 10
       start_period: 20s
 
+  job-extract:
+    build: ./ml
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      MODEL_DIR: /app/model
+    volumes:
+      - ./ml/artifacts/model:/app/model:ro
+    networks:
+      - wa-relay
+
   backend:
     build: ./backend
     restart: unless-stopped
@@ -31,12 +43,27 @@ services:
       - .env
     environment:
       BAILEYS_AUTH_DIR: /app/baileys_auth
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.0-flash}
+      GEMINI_TIMEOUT_MS: ${GEMINI_TIMEOUT_MS:-8000}
+      OWN_MODEL_URL: ${OWN_MODEL_URL:-http://job-extract:8000}
+      OWN_MODEL_TIMEOUT_MS: ${OWN_MODEL_TIMEOUT_MS:-2500}
     volumes:
       - baileys_auth:/app/baileys_auth
       - ./backend/config:/app/config:ro
     depends_on:
       mongo:
         condition: service_healthy
+    networks:
+      - wa-relay
+
+  web:
+    build: ./web
+    restart: unless-stopped
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
     networks:
       - wa-relay
 

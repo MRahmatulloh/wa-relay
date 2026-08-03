@@ -1,5 +1,40 @@
 import Foundation
 
+struct TransferJob: Equatable, Sendable {
+    let from: String?
+    let to: String?
+    let price: Double?
+    let currency: String?
+
+    init(from: String?, to: String?, price: Double?, currency: String?) {
+        self.from = from
+        self.to = to
+        self.price = price
+        self.currency = currency
+    }
+
+    init(json: [String: Any]) {
+        from = Self.nullableString(json["from"])
+        to = Self.nullableString(json["to"])
+        if let n = json["price"] as? NSNumber {
+            price = n.doubleValue
+        } else if let s = Self.nullableString(json["price"]), let d = Double(s) {
+            price = d
+        } else {
+            price = nil
+        }
+        currency = Self.nullableString(json["currency"]) ?? "GBP"
+    }
+
+    private static func nullableString(_ value: Any?) -> String? {
+        guard let value else { return nil }
+        if value is NSNull { return nil }
+        let s = String(describing: value).trimmingCharacters(in: .whitespacesAndNewlines)
+        if s.isEmpty || s == "null" || s == "undefined" { return nil }
+        return s
+    }
+}
+
 struct MatchedMessage: Identifiable, Equatable, Sendable {
     let id: String
     let messageId: String
@@ -12,6 +47,9 @@ struct MatchedMessage: Identifiable, Equatable, Sendable {
     let waLink: String?
     let matchedPattern: String?
     let folder: String?
+    let jobs: [TransferJob]
+    let parseStatus: String?
+    let parseSource: String?
     let timestamp: String?
     let createdAt: String?
     let readAt: String?
@@ -31,6 +69,19 @@ struct MatchedMessage: Identifiable, Equatable, Sendable {
         return sender
     }
 
+    var jobsSummary: String? {
+        guard let first = jobs.first else { return nil }
+        let route = [first.from, first.to].compactMap { $0 }.joined(separator: " → ")
+        let price: String? = {
+            guard let p = first.price else { return nil }
+            if p.rounded() == p { return "£\(Int(p))" }
+            return String(format: "£%.2f", p)
+        }()
+        let base = [route, price].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · ")
+        if base.isEmpty { return nil }
+        return jobs.count > 1 ? "\(base) (+\(jobs.count - 1))" : base
+    }
+
     init(
         id: String,
         messageId: String,
@@ -43,6 +94,9 @@ struct MatchedMessage: Identifiable, Equatable, Sendable {
         waLink: String?,
         matchedPattern: String?,
         folder: String?,
+        jobs: [TransferJob] = [],
+        parseStatus: String? = nil,
+        parseSource: String? = nil,
         timestamp: String?,
         createdAt: String?,
         readAt: String?,
@@ -61,6 +115,9 @@ struct MatchedMessage: Identifiable, Equatable, Sendable {
         self.waLink = waLink
         self.matchedPattern = matchedPattern
         self.folder = folder
+        self.jobs = jobs
+        self.parseStatus = parseStatus
+        self.parseSource = parseSource
         self.timestamp = timestamp
         self.createdAt = createdAt
         self.readAt = readAt
@@ -81,6 +138,13 @@ struct MatchedMessage: Identifiable, Equatable, Sendable {
         waLink = Self.nullableString(json["waLink"])
         matchedPattern = Self.nullableString(json["matchedPattern"])
         folder = Self.nullableString(json["folder"])
+        if let arr = json["jobs"] as? [[String: Any]] {
+            jobs = arr.map { TransferJob(json: $0) }
+        } else {
+            jobs = []
+        }
+        parseStatus = Self.nullableString(json["parseStatus"])
+        parseSource = Self.nullableString(json["parseSource"])
         timestamp = Self.nullableString(json["timestamp"])
         createdAt = Self.nullableString(json["createdAt"])
         readAt = Self.nullableString(json["readAt"])
@@ -108,6 +172,9 @@ struct MatchedMessage: Identifiable, Equatable, Sendable {
             waLink: waLink,
             matchedPattern: matchedPattern,
             folder: folder,
+            jobs: jobs,
+            parseStatus: parseStatus,
+            parseSource: parseSource,
             timestamp: timestamp,
             createdAt: createdAt,
             readAt: clearReadAt ? nil : (readAt ?? self.readAt),

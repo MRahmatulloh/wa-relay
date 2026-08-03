@@ -1,5 +1,15 @@
 import mongoose from 'mongoose';
 
+const jobSchema = new mongoose.Schema(
+  {
+    from: { type: String, default: null },
+    to: { type: String, default: null },
+    price: { type: Number, default: null },
+    currency: { type: String, default: 'GBP' },
+  },
+  { _id: false },
+);
+
 const messageSchema = new mongoose.Schema(
   {
     messageId: { type: String, required: true, unique: true },
@@ -12,6 +22,9 @@ const messageSchema = new mongoose.Schema(
     waLink: { type: String, default: null },
     matchedPattern: { type: String, default: null },
     folder: { type: String, default: 'others' },
+    jobs: { type: [jobSchema], default: [] },
+    parseStatus: { type: String, default: 'empty' },
+    parseSource: { type: String, default: null },
     timestamp: { type: Date, required: true },
     readAt: { type: Date, default: null },
     starred: { type: Boolean, default: false },
@@ -30,6 +43,7 @@ messageSchema.index({ readAt: 1, createdAt: -1 });
 messageSchema.index({ thumbsUp: 1, createdAt: -1 });
 messageSchema.index({ text: 1, senderPhone: 1, timestamp: -1 });
 messageSchema.index({ text: 1, participantJid: 1, timestamp: -1 });
+messageSchema.index({ parseStatus: 1, createdAt: -1 });
 
 export const Message = mongoose.model('Message', messageSchema);
 
@@ -46,6 +60,16 @@ export function serializeMessage(m) {
     waLink: m.waLink,
     matchedPattern: m.matchedPattern,
     folder: m.folder || 'others',
+    jobs: Array.isArray(m.jobs)
+      ? m.jobs.map((j) => ({
+          from: j.from || null,
+          to: j.to || null,
+          price: j.price == null ? null : Number(j.price),
+          currency: j.currency || 'GBP',
+        }))
+      : [],
+    parseStatus: m.parseStatus || 'empty',
+    parseSource: m.parseSource || null,
     timestamp: m.timestamp,
     createdAt: m.createdAt,
     readAt: m.readAt || null,

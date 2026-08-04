@@ -8,6 +8,10 @@
   --accent-2: #c9a227;
   --danger: #d96b6b;
   --radius: 12px;
+  --btn-h: 40px;
+  --btn-px: 14px;
+  --btn-radius: 10px;
+  --btn-icon: 16px;
   font-family: "Segoe UI", "IBM Plex Sans", system-ui, sans-serif;
   color: var(--text);
   background: radial-gradient(1200px 600px at 10% -10%, #1c3326 0%, transparent 55%),
@@ -25,8 +29,193 @@ body {
 
 button,
 input,
-select {
+select,
+a {
   font: inherit;
+}
+
+/*
+  Single button shell = Log out recipe.
+  Same height / padding / radius / border / icon for every control.
+  Only tint changes by role.
+*/
+.btn,
+.btn-secondary,
+.btn-danger,
+.btn-wa,
+.login-card > form > button,
+.login-card button[type="submit"],
+.toolbar button,
+.msg-actions button,
+.msg-actions a,
+.settings-form button,
+.more,
+.logout-btn,
+.ghost {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: var(--btn-h);
+  min-height: var(--btn-h);
+  max-height: var(--btn-h);
+  padding: 0 var(--btn-px);
+  border-radius: var(--btn-radius);
+  font-weight: 600;
+  font-size: 0.95rem;
+  line-height: 1;
+  cursor: pointer;
+  text-decoration: none;
+  border: 1px solid color-mix(in srgb, var(--danger) 45%, var(--line));
+  background: color-mix(in srgb, var(--danger) 14%, var(--panel));
+  color: #ffd5d5;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.12s ease;
+}
+
+.btn:hover,
+.btn-secondary:hover,
+.btn-danger:hover,
+.btn-wa:hover,
+.login-card button[type="submit"]:hover,
+.toolbar button:hover,
+.msg-actions button:hover,
+.msg-actions a:hover,
+.settings-form button:hover,
+.more:hover,
+.logout-btn:hover,
+.ghost:hover {
+  background: color-mix(in srgb, var(--danger) 28%, var(--panel));
+  border-color: color-mix(in srgb, var(--danger) 70%, var(--line));
+}
+
+.btn:active,
+.btn-secondary:active,
+.btn-danger:active,
+.btn-wa:active,
+.login-card button[type="submit"]:active,
+.toolbar button:active,
+.msg-actions button:active,
+.msg-actions a:active,
+.settings-form button:active,
+.more:active,
+.logout-btn:active,
+.ghost:active {
+  transform: translateY(1px);
+}
+
+.btn:disabled,
+.btn-secondary:disabled,
+.login-card button:disabled,
+.toolbar button:disabled,
+.more:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.btn .btn-icon,
+.btn-secondary .btn-icon,
+.btn-danger .btn-icon,
+.btn-wa .btn-icon,
+.login-card button .btn-icon,
+.toolbar button .btn-icon,
+.msg-actions .btn-icon,
+.settings-form button .btn-icon,
+.more .btn-icon,
+.logout-btn .btn-icon,
+.ghost .btn-icon {
+  width: var(--btn-icon);
+  height: var(--btn-icon);
+  flex: 0 0 auto;
+}
+
+/* Primary actions — same shell, accent tint */
+.btn,
+.login-card button[type="submit"],
+.toolbar button,
+.msg-actions button,
+.msg-actions a,
+.settings-form button {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
+  background: color-mix(in srgb, var(--accent) 14%, var(--panel));
+  color: #c8efd4;
+}
+
+.btn:hover,
+.login-card button[type="submit"]:hover,
+.toolbar button:hover,
+.msg-actions button:hover,
+.msg-actions a:hover,
+.settings-form button:hover {
+  background: color-mix(in srgb, var(--accent) 28%, var(--panel));
+  border-color: color-mix(in srgb, var(--accent) 70%, var(--line));
+}
+
+/* Back / Refresh / Settings — same shell as Log out */
+.btn-secondary,
+.ghost,
+.more {
+  border-color: color-mix(in srgb, var(--danger) 45%, var(--line));
+  background: color-mix(in srgb, var(--danger) 14%, var(--panel));
+  color: #ffd5d5;
+}
+
+.btn-secondary:hover,
+.ghost:hover,
+.more:hover {
+  background: color-mix(in srgb, var(--danger) 28%, var(--panel));
+  border-color: color-mix(in srgb, var(--danger) 70%, var(--line));
+}
+
+.btn-danger,
+.logout-btn,
+.msg-actions button.danger {
+  border-color: color-mix(in srgb, var(--danger) 45%, var(--line));
+  background: color-mix(in srgb, var(--danger) 14%, var(--panel));
+  color: #ffd5d5;
+}
+
+.btn-danger:hover,
+.logout-btn:hover,
+.msg-actions button.danger:hover {
+  background: color-mix(in srgb, var(--danger) 28%, var(--panel));
+  border-color: color-mix(in srgb, var(--danger) 70%, var(--line));
+}
+
+.btn-wa,
+.msg-actions a.wa-btn {
+  border-color: color-mix(in srgb, #25d366 45%, var(--line));
+  background: color-mix(in srgb, #25d366 14%, var(--panel));
+  color: #d8ffe8;
+}
+
+.btn-wa:hover,
+.msg-actions a.wa-btn:hover {
+  background: color-mix(in srgb, #25d366 28%, var(--panel));
+  border-color: color-mix(in srgb, #25d366 70%, var(--line));
+}
+
+.icon-btn {
+  width: var(--btn-h);
+  min-width: var(--btn-h);
+  height: var(--btn-h);
+  min-height: var(--btn-h);
+  max-height: var(--btn-h);
+  padding: 0;
+}
+
+.top-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.top-actions > * {
+  height: var(--btn-h);
+  min-height: var(--btn-h);
+  max-height: var(--btn-h);
 }
 
 .login-wrap {
@@ -62,34 +251,140 @@ select {
 
 .login-card input,
 .toolbar input,
-.toolbar select {
+.toolbar select,
+.settings-form input {
   width: 100%;
+  height: var(--btn-h);
   border: 1px solid var(--line);
   background: #101612;
   color: var(--text);
-  border-radius: 8px;
-  padding: 10px 12px;
+  border-radius: var(--btn-radius);
+  padding: 0 12px;
 }
 
-.login-card button,
-.toolbar button,
-.msg-actions button,
-.msg-actions a,
-.more {
-  border: 0;
-  border-radius: 8px;
-  padding: 10px 14px;
-  background: var(--accent);
-  color: #04140b;
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.toolbar select {
+  width: auto;
+  min-width: 120px;
+}
+
+.search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 220px;
+}
+
+.settings-section {
+  margin-bottom: 22px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--panel) 88%, black);
+}
+
+.settings-section h2 {
+  margin: 0 0 12px;
+  font-size: 0.95rem;
+  letter-spacing: 0.02em;
+  color: var(--muted);
+  font-weight: 650;
+}
+
+.settings-form {
+  display: grid;
+  gap: 10px;
+}
+
+.settings-form label {
+  display: grid;
+  gap: 6px;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.settings-form button[type="submit"] {
+  justify-self: start;
+}
+
+.saved-hint {
+  margin: 0;
+  color: var(--accent);
+  font-size: 0.85rem;
   font-weight: 600;
-  cursor: pointer;
-  text-decoration: none;
 }
 
-.ghost {
-  background: transparent !important;
-  color: var(--text) !important;
-  border: 1px solid var(--line) !important;
+.account-line {
+  margin: 0 0 12px;
+  font-weight: 600;
+}
+
+.session-card {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  padding: 14px;
+}
+
+.session-card p {
+  margin: 4px 0 0;
+}
+
+.session-card.session-ok {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--line));
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: #b8e6c8;
+}
+
+.session-card.session-bad {
+  border-color: color-mix(in srgb, var(--danger) 55%, var(--line));
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+  color: #ffd5d5;
+}
+
+.session-card.session-checking {
+  color: var(--muted);
+}
+
+.session-icon {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  flex: 0 0 auto;
+}
+
+.session-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--line);
+  border-top-color: var(--muted);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.qr-link {
+  display: inline-block;
+  margin-top: 10px;
+  color: var(--accent-2);
+  font-weight: 600;
 }
 
 .muted {
@@ -104,7 +399,7 @@ select {
   color: #ffd5d5;
   background: color-mix(in srgb, var(--danger) 25%, transparent);
   border: 1px solid color-mix(in srgb, var(--danger) 55%, transparent);
-  border-radius: 8px;
+  border-radius: 10px;
   padding: 8px 10px;
 }
 
@@ -135,37 +430,36 @@ select {
 }
 
 .folders button {
+  box-sizing: border-box;
   flex: 0 0 auto;
-  border: 1px solid var(--line);
-  background: var(--panel);
-  color: var(--text);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: var(--btn-h);
+  min-height: var(--btn-h);
+  border: 1px solid color-mix(in srgb, var(--danger) 45%, var(--line));
+  background: color-mix(in srgb, var(--danger) 14%, var(--panel));
+  color: #ffd5d5;
   border-radius: 999px;
-  padding: 8px 12px;
+  padding: 0 14px;
+  font-weight: 600;
   cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.12s ease;
+}
+
+.folders button:hover {
+  background: color-mix(in srgb, var(--danger) 28%, var(--panel));
+  border-color: color-mix(in srgb, var(--danger) 70%, var(--line));
+}
+
+.folders button:active {
+  transform: translateY(1px);
 }
 
 .folders button.active {
-  background: color-mix(in srgb, var(--accent) 30%, var(--panel));
-  border-color: var(--accent);
-}
-
-.toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 14px;
-}
-
-.toolbar select {
-  width: auto;
-  min-width: 120px;
-}
-
-.search {
-  display: flex;
-  gap: 8px;
-  flex: 1;
-  min-width: 220px;
+  background: color-mix(in srgb, var(--accent) 24%, var(--panel));
+  border-color: color-mix(in srgb, var(--accent) 65%, var(--line));
+  color: #c8efd4;
 }
 
 .list {
@@ -193,6 +487,19 @@ select {
   color: inherit;
   padding: 14px 14px 10px;
   cursor: pointer;
+  display: block;
+  height: auto;
+  min-height: 0;
+  max-height: none;
+  border-radius: 0;
+  transform: none;
+}
+
+.msg-main:hover,
+.msg-main:active {
+  background: transparent;
+  border: 0;
+  transform: none;
 }
 
 .msg-top {
@@ -212,9 +519,43 @@ select {
 }
 
 .jobs {
-  color: #d7e8d9;
-  font-weight: 650;
-  margin-bottom: 6px;
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0 10px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--accent-2) 45%, var(--line));
+  background: color-mix(in srgb, var(--accent-2) 14%, var(--panel));
+  color: #f3e6b0;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.jobs-route {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.jobs-arrow {
+  color: var(--accent-2);
+  font-weight: 800;
+}
+
+.jobs-price {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 28%, transparent);
+  color: #c8efd4;
+  font-size: 0.85rem;
+}
+
+.jobs-extra {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 600;
 }
 
 .preview {
@@ -238,13 +579,16 @@ select {
 .msg-actions {
   display: flex;
   flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
   gap: 8px;
   padding: 0 14px 14px;
 }
 
-.msg-actions a {
-  display: inline-flex;
-  align-items: center;
+.btn-icon {
+  width: var(--btn-icon);
+  height: var(--btn-icon);
+  flex: 0 0 auto;
 }
 
 .empty {
@@ -253,10 +597,7 @@ select {
 }
 
 .more {
-  display: block;
+  display: flex;
   width: 100%;
   margin-top: 14px;
-  background: var(--panel);
-  color: var(--text);
-  border: 1px solid var(--line);
 }

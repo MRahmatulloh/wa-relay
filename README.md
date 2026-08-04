@@ -16,7 +16,7 @@ docker compose up --build
 
 - API: http://localhost:4500
 - Web admin: http://localhost:5173
-- Job extract model: http://localhost:8000/health
+- Job extract model: http://localhost:8282/health
 - QR login: http://localhost:4500/qr (HTTP Basic Auth by default — same username/password as app users; set `QR_BASIC_AUTH=false` to disable)
 - Health: http://localhost:4500/health
 - MongoDB (auth): `localhost:27018` — URI like `mongodb://wa_relay:<password>@HOST:27018/wa-relay?authSource=admin`

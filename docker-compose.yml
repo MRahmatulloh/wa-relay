@@ -26,7 +26,7 @@ services:
     build: ./ml
     restart: unless-stopped
     ports:
-      - "8000:8000"
+      - "8282:8000"
     environment:
       MODEL_DIR: /app/model
     volumes:

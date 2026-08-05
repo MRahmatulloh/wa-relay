@@ -15,7 +15,7 @@ docker compose up --build
 ```
 
 - API: http://localhost:4500
-- Web admin: http://localhost:5173
+- Web admin: http://localhost:8182
 - Job extract model: http://localhost:8282/health
 - QR login: http://localhost:4500/qr (HTTP Basic Auth by default — same username/password as app users; set `QR_BASIC_AUTH=false` to disable)
 - Health: http://localhost:4500/health

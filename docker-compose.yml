@@ -22,17 +22,18 @@ services:
       retries: 10
       start_period: 20s
 
-  job-extract:
-    build: ./ml
-    restart: unless-stopped
-    ports:
-      - "8282:8000"
-    environment:
-      MODEL_DIR: /app/model
-    volumes:
-      - ./ml/artifacts/model:/app/model:ro
-    networks:
-      - wa-relay
+  # Temporarily disabled — Flan-T5 job-extract (./ml)
+  # job-extract:
+  #   build: ./ml
+  #   restart: unless-stopped
+  #   ports:
+  #     - "8282:8000"
+  #   environment:
+  #     MODEL_DIR: /app/model
+  #   volumes:
+  #     - ./ml/artifacts/model:/app/model:ro
+  #   networks:
+  #     - wa-relay
 
   backend:
     build: ./backend
@@ -46,7 +47,8 @@ services:
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.0-flash}
       GEMINI_TIMEOUT_MS: ${GEMINI_TIMEOUT_MS:-8000}
-      OWN_MODEL_URL: ${OWN_MODEL_URL:-http://job-extract:8000}
+      # Empty while job-extract is off (Gemini → rules_v1 only)
+      OWN_MODEL_URL: ${OWN_MODEL_URL:-}
       OWN_MODEL_TIMEOUT_MS: ${OWN_MODEL_TIMEOUT_MS:-2500}
     volumes:
       - baileys_auth:/app/baileys_auth
@@ -61,7 +63,7 @@ services:
     build: ./web
     restart: unless-stopped
     ports:
-      - "5173:80"
+      - "8182:80"
     depends_on:
       - backend
     networks:

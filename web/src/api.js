@@ -24,6 +24,19 @@ function url(path) {
   return `${host}${path}`
 }
 
+function friendlyHttpError(status, text) {
+  const raw = typeof text === 'string' ? text.trim() : ''
+  if (!raw) return `HTTP ${status}`
+  if (raw.startsWith('<') || /<\/?(html|head|body|title|h1)\b/i.test(raw)) {
+    const title = raw.match(/<title>([^<]+)<\/title>/i)?.[1]
+    const h1 = raw.match(/<h1>([^<]+)<\/h1>/i)?.[1]
+    const label = (title || h1 || `HTTP ${status}`).replace(/\s+/g, ' ').trim()
+    return label
+  }
+  if (raw.length > 180) return `HTTP ${status}`
+  return raw
+}
+
 async function request(path, { method = 'GET', body, auth = true } = {}) {
   const headers = { 'Content-Type': 'application/json' }
   if (auth) {
@@ -40,7 +53,7 @@ async function request(path, { method = 'GET', body, auth = true } = {}) {
   try {
     data = text ? JSON.parse(text) : null
   } catch {
-    data = { error: text }
+    data = null
   }
   if (res.status === 401) {
     const err = new Error('Unauthorized')
@@ -48,7 +61,10 @@ async function request(path, { method = 'GET', body, auth = true } = {}) {
     throw err
   }
   if (!res.ok) {
-    throw new Error(data?.error || `HTTP ${res.status}`)
+    const msg =
+      (data && typeof data.error === 'string' && data.error) ||
+      friendlyHttpError(res.status, text)
+    throw new Error(msg)
   }
   return data
 }
@@ -71,8 +87,28 @@ export function fetchMessages(query = {}) {
   return request(`/messages${qs ? `?${qs}` : ''}`)
 }
 
+export function fetchMapMessages(query = {}) {
+  const params = new URLSearchParams()
+  Object.entries(query).forEach(([k, v]) => {
+    if (v === undefined || v === null || v === '') return
+    params.set(k, String(v))
+  })
+  const qs = params.toString()
+  return request(`/messages/map${qs ? `?${qs}` : ''}`)
+}
+
 export function fetchUnreadByFolder() {
   return request('/messages/unread-counts')
+}
+
+export function fetchFolderCounts(query = {}) {
+  const params = new URLSearchParams()
+  Object.entries(query).forEach(([k, v]) => {
+    if (v === undefined || v === null || v === '') return
+    params.set(k, String(v))
+  })
+  const qs = params.toString()
+  return request(`/messages/folder-counts${qs ? `?${qs}` : ''}`)
 }
 
 export function patchMessage(id, patch) {

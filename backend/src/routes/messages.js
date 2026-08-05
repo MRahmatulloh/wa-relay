@@ -58,7 +58,41 @@ function buildListFilter(query) {
     ];
   }
 
+  const createdAfter = resolveCreatedAfter(query);
+  if (createdAfter) {
+    filter.createdAt = { $gte: createdAfter };
+  }
+
   return filter;
+}
+
+/** `time=2h` | `time=today` | raw ISO via `since`. */
+function resolveCreatedAfter(query) {
+  const sinceRaw = String(query.since || '').trim();
+  if (sinceRaw) {
+    const d = new Date(sinceRaw);
+    if (!Number.isNaN(d.getTime())) return d;
+  }
+
+  const time = String(query.time || '').trim().toLowerCase();
+  if (!time || time === 'all') return null;
+
+  const now = new Date();
+  if (time === 'today') {
+    const start = new Date(now);
+    start.setHours(0, 0, 0, 0);
+    return start;
+  }
+
+  const m = /^(\d+)\s*h$/.exec(time);
+  if (m) {
+    const hours = Number(m[1]);
+    if (Number.isFinite(hours) && hours > 0 && hours <= 168) {
+      return new Date(now.getTime() - hours * 60 * 60 * 1000);
+    }
+  }
+
+  return null;
 }
 
 router.get('/', authMiddleware, async (req, res) => {
@@ -81,14 +115,18 @@ router.get('/', authMiddleware, async (req, res) => {
           { createdAt: cursorDoc.createdAt, _id: { $lt: cursorDoc._id } },
         ],
       };
-      // Combine list filter with cursor. If filter already has $or (search), use $and.
+      // Always $and cursor so time-window `createdAt` / search `$or` are preserved.
+      const extras = [];
       if (filter.$or) {
-        const searchOr = filter.$or;
+        extras.push({ $or: filter.$or });
         delete filter.$or;
-        filter.$and = [{ $or: searchOr }, older];
-      } else {
-        Object.assign(filter, older);
       }
+      if (filter.$and) {
+        extras.push(...filter.$and);
+        delete filter.$and;
+      }
+      extras.push(older);
+      filter.$and = extras;
     }
 
     const rows = await Message.find(filter)
@@ -130,11 +168,98 @@ async function computeUnreadCounts() {
   return counts;
 }
 
+/** Counts per folder for current list filters (ignores `folder` so every chip gets a total). */
+async function computeFolderCounts(query) {
+  const filter = buildListFilter(query);
+  delete filter.folder;
+
+  const mapOnly = parseBool(query.map);
+  if (mapOnly === true) {
+    const hasFrom = {
+      jobs: {
+        $elemMatch: {
+          fromLat: { $type: 'number' },
+          fromLng: { $type: 'number' },
+        },
+      },
+    };
+    if (filter.$or) {
+      const searchOr = filter.$or;
+      delete filter.$or;
+      filter.$and = [...(filter.$and || []), { $or: searchOr }, hasFrom];
+    } else if (filter.$and) {
+      filter.$and.push(hasFrom);
+    } else {
+      Object.assign(filter, hasFrom);
+    }
+  }
+
+  const rows = await Message.aggregate([
+    { $match: filter },
+    { $group: { _id: { $ifNull: ['$folder', 'others'] }, count: { $sum: 1 } } },
+  ]);
+  const counts = { all: 0, lgw: 0, lhr: 0, ltn: 0, stn: 0, others: 0 };
+  for (const row of rows) {
+    const key = String(row._id || 'others').toLowerCase();
+    const n = Number(row.count) || 0;
+    if (Object.prototype.hasOwnProperty.call(counts, key)) {
+      counts[key] = n;
+    } else {
+      counts.others += n;
+    }
+    counts.all += n;
+  }
+  return counts;
+}
+
 router.get('/unread-counts', authMiddleware, async (_req, res) => {
   try {
     return res.json({ counts: await computeUnreadCounts() });
   } catch (err) {
     console.error('unread-counts error', err);
+    return res.status(500).json({ error: 'Server error' });
+  }
+});
+
+router.get('/folder-counts', authMiddleware, async (req, res) => {
+  try {
+    return res.json({ counts: await computeFolderCounts(req.query) });
+  } catch (err) {
+    console.error('folder-counts error', err);
+    return res.status(500).json({ error: 'Server error' });
+  }
+});
+
+/** Map view: same list filters, only messages with fromLat/fromLng, up to 500. */
+router.get('/map', authMiddleware, async (req, res) => {
+  try {
+    const filter = buildListFilter(req.query);
+    const hasFrom = {
+      jobs: {
+        $elemMatch: {
+          fromLat: { $type: 'number' },
+          fromLng: { $type: 'number' },
+        },
+      },
+    };
+
+    let query;
+    if (filter.$or) {
+      const searchOr = filter.$or;
+      delete filter.$or;
+      query = { ...filter, $and: [{ $or: searchOr }, hasFrom] };
+    } else {
+      query = { ...filter, ...hasFrom };
+    }
+
+    const rows = await Message.find(query)
+      .sort({ createdAt: -1, _id: -1 })
+      .limit(500)
+      .lean();
+
+    return res.json({ messages: rows.map(serializeMessage) });
+  } catch (err) {
+    console.error('messages map error', err);
     return res.status(500).json({ error: 'Server error' });
   }
 });

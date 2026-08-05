@@ -32,6 +32,8 @@ function isGarbagePlace(s) {
   if (/^(mpv|van|saloon|estate|executive|minibus)\b/i.test(t)) return true;
   if (/\b\d?\s*seater\b/i.test(t) && !/\b[A-Z]{1,2}\d/i.test(t)) return true;
   if (/^(pick[\s-]?up|drop[\s-]?off|landing)\b/i.test(t)) return true;
+  // "Time: 22:45" / "Pick-up Time" value mistaken as a place
+  if (/^time\s*:?\s*\d{1,2}:\d{2}/i.test(t)) return true;
   if (/^up\)/i.test(t)) return true;
   if (/^(pair|connection)\s*jobs?\b/i.test(t)) return true;
   if (/^\d{1,2}([.:]\d{2})?\s*(am|pm)?$/i.test(t)) return true;
@@ -239,7 +241,8 @@ function extractLabeled(chunk) {
 
   const pick = labeledBlock(
     chunk,
-    'pick[\\s-]?up(?:\\s+location)?|pickup|p\\s*/\\s*u|\\bpu\\b|from|address',
+    // Exclude "Pick-up Time" / "Pickup Time" — those are clock labels, not places.
+    'pick[\\s-]?up(?!\\s*time\\b)(?:\\s+location)?|pickup(?!\\s*time\\b)|p\\s*/\\s*u|\\bpu\\b|from|address',
   );
   const drop = labeledBlock(
     chunk,

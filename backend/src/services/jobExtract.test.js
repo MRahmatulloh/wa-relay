@@ -131,6 +131,23 @@ describe('extractJobsRules', () => {
     assert.equal(r.jobs[0].price, 90);
   });
 
+  it('Pick-up Time does not steal Pick-up place (Heathrow → postcode)', () => {
+    const r = extractJobsRules(
+      [
+        '*Today Job*',
+        '*Pick-up Time: 22:45*',
+        '*Pick-up: Heathrow Airport*',
+        '*Drop-Off: N16 5JA*',
+        '*MPV8 Required*',
+        '*Price: £75*',
+      ].join('\n'),
+    );
+    assert.equal(r.jobs.length, 1);
+    assert.equal(r.jobs[0].from, 'LHR');
+    assert.match(r.jobs[0].to, /N16\s*5JA/i);
+    assert.equal(r.jobs[0].price, 75);
+  });
+
   it('postcode To airport', () => {
     const r = extractJobsRules('ASAP (Pax Ready)\n\nUB7 9HU To Heathrow\n\nAny 8/9 Seater \n\n£50 NET');
     assert.match(r.jobs[0].from, /UB7/);

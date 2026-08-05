@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { io } from 'socket.io-client'
 import {
+  fetchFolderCounts,
   fetchHealth,
   fetchMessages,
-  fetchUnreadByFolder,
   getHost,
   getToken,
   login,
@@ -11,18 +11,10 @@ import {
   setHost,
   setToken,
 } from './api'
+import MapsScreen from './MapsScreen'
+import { DEFAULT_TIME_RANGE, FILTERS, FOLDERS, TIME_RANGES } from './filters'
+import { ToastStack } from './Toast'
 import './App.css'
-
-const FOLDERS = ['all', 'lgw', 'lhr', 'ltn', 'stn', 'others']
-const FILTERS = [
-  { id: 'all', label: 'All' },
-  { id: 'unread', label: 'Unread' },
-  { id: 'read', label: 'Read' },
-  { id: 'starred', label: 'Starred' },
-  { id: 'thumbsUp', label: 'Thumbs up' },
-  { id: 'done', label: 'Done' },
-  { id: 'parseBug', label: 'Parse bugs' },
-]
 
 function formatJobs(jobs) {
   if (!Array.isArray(jobs) || !jobs.length) return null
@@ -57,6 +49,12 @@ function formatJobs(jobs) {
   const miles = milesNum != null ? `${milesNum} mi` : null
   const perMile = perMileNum != null ? `£${perMileNum}/mi` : null
   if (!from && !to && !price && !miles) return null
+
+  const fromLat = Number(j.fromLat)
+  const fromLng = Number(j.fromLng)
+  const toLat = Number(j.toLat)
+  const toLng = Number(j.toLng)
+
   return {
     from,
     to,
@@ -64,7 +62,42 @@ function formatJobs(jobs) {
     miles,
     perMile,
     extra: jobs.length > 1 ? jobs.length - 1 : 0,
+    fromLat: Number.isFinite(fromLat) ? fromLat : null,
+    fromLng: Number.isFinite(fromLng) ? fromLng : null,
+    toLat: Number.isFinite(toLat) ? toLat : null,
+    toLng: Number.isFinite(toLng) ? toLng : null,
   }
+}
+
+/** Google Maps directions to a place (coords preferred, else name). */
+function googleMapsDirUrl({ lat, lng, label }) {
+  const dest =
+    lat != null && lng != null && Number.isFinite(lat) && Number.isFinite(lng)
+      ? `${lat},${lng}`
+      : (label || '').trim()
+  if (!dest) return null
+  return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(dest)}`
+}
+
+function PlaceLink({ label, lat, lng, fallback = '—' }) {
+  const text = label || fallback
+  const href = googleMapsDirUrl({ lat, lng, label })
+  if (!href || text === fallback) {
+    return <span className="jobs-place muted">{text}</span>
+  }
+  return (
+    <a
+      className="jobs-place"
+      href={href}
+      target="_blank"
+      rel="noreferrer"
+      title={`Open in Google Maps: ${text}`}
+      onClick={(e) => e.stopPropagation()}
+      onKeyDown={(e) => e.stopPropagation()}
+    >
+      {text}
+    </a>
+  )
 }
 
 function formatTime(iso) {
@@ -154,12 +187,18 @@ function buildWaMeUrl(waLink, text) {
   return `${base}?text=${encodeURIComponent(truncated)}`
 }
 
-function MessageRow({ msg, onPatch }) {
-  const [open, setOpen] = useState(false)
+function MessageRow({ msg, onPatch, defaultOpen = false }) {
+  const [open, setOpen] = useState(defaultOpen)
   const [copied, setCopied] = useState(false)
   const jobsLine = formatJobs(msg.jobs)
   const unread = !msg.readAt
   const waHref = buildWaMeUrl(msg.waLink, msg.text)
+
+  useEffect(() => {
+    if (defaultOpen && unread) onPatch(msg, { read: true })
+    // mark read once when opened from map
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   function toggleOpen() {
     const next = !open
@@ -180,7 +219,18 @@ function MessageRow({ msg, onPatch }) {
 
   return (
     <article className={`msg ${unread ? 'unread' : ''}`}>
-      <button type="button" className="msg-main" onClick={toggleOpen}>
+      <div
+        className="msg-main"
+        role="button"
+        tabIndex={0}
+        onClick={toggleOpen}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault()
+            toggleOpen()
+          }
+        }}
+      >
         <div className="msg-top">
           <span className={`unread-dot ${unread ? 'on' : ''}`} aria-hidden="true" />
           <strong className={unread ? 'msg-title-unread' : undefined}>
@@ -198,9 +248,17 @@ function MessageRow({ msg, onPatch }) {
           <div className="jobs">
             {(jobsLine.from || jobsLine.to) ? (
               <span className="jobs-route">
-                {jobsLine.from || '—'}
+                <PlaceLink
+                  label={jobsLine.from}
+                  lat={jobsLine.fromLat}
+                  lng={jobsLine.fromLng}
+                />
                 <span className="jobs-arrow" aria-hidden="true">→</span>
-                {jobsLine.to || '—'}
+                <PlaceLink
+                  label={jobsLine.to}
+                  lat={jobsLine.toLat}
+                  lng={jobsLine.toLng}
+                />
               </span>
             ) : null}
             {jobsLine.price ? <span className="jobs-price">{jobsLine.price}</span> : null}
@@ -218,7 +276,7 @@ function MessageRow({ msg, onPatch }) {
           {msg.thumbsUp ? ' · 👍' : ''}
           {msg.done ? ' · done' : ''}
         </div>
-      </button>
+      </div>
       {open ? (
         <div className="msg-actions">
           <button type="button" onClick={() => onPatch(msg, { starred: !msg.starred })}>
@@ -422,19 +480,44 @@ function Settings({ username, onBack, onLogout, onHostSaved }) {
   )
 }
 
-function Inbox({ onLogout, onOpenSettings }) {
-  const [folder, setFolder] = useState('all')
-  const [filter, setFilter] = useState('all')
-  const [q, setQ] = useState('')
-  const [search, setSearch] = useState('')
+function Inbox({
+  onLogout,
+  onOpenSettings,
+  onOpenMaps,
+  folder,
+  setFolder,
+  filter,
+  setFilter,
+  search,
+  setSearch,
+  timeRange,
+  setTimeRange,
+}) {
+  const [q, setQ] = useState(search || '')
   const [messages, setMessages] = useState([])
   const [counts, setCounts] = useState({})
-  const [error, setError] = useState('')
+  const [toasts, setToasts] = useState([])
   const [loading, setLoading] = useState(false)
   const [nextCursor, setNextCursor] = useState(null)
 
+  function pushToast(message, tone = 'error') {
+    const text = typeof message === 'string' ? message.trim() : ''
+    if (!text) return
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+    setToasts((prev) => [...prev.slice(-4), { id, message: text, tone }])
+  }
+
+  function dismissToast(id) {
+    setToasts((prev) => prev.filter((t) => t.id !== id))
+  }
+
   const query = useMemo(() => {
-    const base = { folder: folder === 'all' ? undefined : folder, q: search || undefined, limit: 40 }
+    const base = {
+      folder: folder === 'all' ? undefined : folder,
+      q: search || undefined,
+      limit: 40,
+      time: timeRange || undefined,
+    }
     if (filter === 'unread') base.unread = true
     if (filter === 'read') base.unread = false
     if (filter === 'starred') base.starred = true
@@ -442,17 +525,21 @@ function Inbox({ onLogout, onOpenSettings }) {
     if (filter === 'done') base.done = true
     if (filter === 'parseBug') base.parseBug = true
     return base
-  }, [folder, filter, search])
+  }, [folder, filter, search, timeRange])
+
+  const countsQuery = useMemo(() => {
+    const { folder: _f, limit: _l, ...rest } = query
+    return rest
+  }, [query])
 
   const load = useCallback(
     async (cursor) => {
       setLoading(true)
-      setError('')
       try {
         const data = await fetchMessages({ ...query, before: cursor || undefined })
         setMessages((prev) => (cursor ? [...prev, ...data.messages] : data.messages))
         setNextCursor(data.nextCursor)
-        const c = await fetchUnreadByFolder().catch(() => null)
+        const c = await fetchFolderCounts(countsQuery).catch(() => null)
         if (c?.counts) setCounts(c.counts)
       } catch (err) {
         if (err.code === 401) {
@@ -460,12 +547,12 @@ function Inbox({ onLogout, onOpenSettings }) {
           onLogout()
           return
         }
-        setError(err.message || 'Failed to load')
+        pushToast(err.message || 'Failed to load')
       } finally {
         setLoading(false)
       }
     },
-    [query, onLogout],
+    [query, countsQuery, onLogout],
   )
 
   useEffect(() => {
@@ -505,17 +592,18 @@ function Inbox({ onLogout, onOpenSettings }) {
             return true
           }),
       )
-      if ('read' in patch || (wasUnread && updated.readAt)) {
-        const c = await fetchUnreadByFolder().catch(() => null)
+      if ('read' in patch || (wasUnread && updated.readAt) || 'starred' in patch || 'done' in patch || 'thumbsUp' in patch || 'parseBug' in patch) {
+        const c = await fetchFolderCounts(countsQuery).catch(() => null)
         if (c?.counts) setCounts(c.counts)
       }
     } catch (err) {
-      setError(err.message)
+      pushToast(err.message)
     }
   }
 
   return (
     <div className="admin">
+      <ToastStack items={toasts} onDismiss={dismissToast} />
       <header className="top">
         <div>
           <h1>WA Relay</h1>
@@ -540,21 +628,62 @@ function Inbox({ onLogout, onOpenSettings }) {
             onClick={() => setFolder(f)}
           >
             {f.toUpperCase()}
-            {f !== 'all' && counts[f] ? ` (${counts[f]})` : ''}
+            {counts[f] ? ` (${counts[f]})` : ''}
           </button>
         ))}
       </div>
 
       <div className="toolbar">
-        <select value={filter} onChange={(e) => setFilter(e.target.value)}>
-          {FILTERS.map((f) => (
-            <option key={f.id} value={f.id}>
-              {f.label}
-            </option>
-          ))}
-        </select>
+        <div className="toolbar-row">
+          <select
+            className="toolbar-select"
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+            aria-label="Status filter"
+          >
+            {FILTERS.map((f) => (
+              <option key={f.id} value={f.id}>
+                {f.label}
+              </option>
+            ))}
+          </select>
+          <select
+            className="toolbar-select"
+            value={timeRange}
+            onChange={(e) => setTimeRange(e.target.value)}
+            title="Message time window"
+            aria-label="Time window"
+          >
+            {TIME_RANGES.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.label}
+              </option>
+            ))}
+          </select>
+          <div className="toolbar-actions">
+            <button
+              type="button"
+              className="btn-secondary toolbar-icon-btn"
+              onClick={() => load(null)}
+              disabled={loading}
+              title="Refresh"
+              aria-label="Refresh"
+            >
+              <Icon d="M21 12a9 9 0 11-2.64-6.36M21 3v6h-6" />
+            </button>
+            <button
+              type="button"
+              className="btn-secondary toolbar-icon-btn"
+              onClick={() => onOpenMaps()}
+              title="Show on map"
+              aria-label="On Maps"
+            >
+              <Icon d="M12 2C8.1 2 5 5.1 5 9c0 5.2 7 13 7 13s7-7.8 7-13c0-3.9-3.1-7-7-7zm0 9.5a2.5 2.5 0 110-5 2.5 2.5 0 010 5z" />
+            </button>
+          </div>
+        </div>
         <form
-          className="search"
+          className="toolbar-row search-bar"
           onSubmit={(e) => {
             e.preventDefault()
             setSearch(q.trim())
@@ -564,19 +693,13 @@ function Inbox({ onLogout, onOpenSettings }) {
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Search text, from, to…"
+            aria-label="Search"
           />
-          <button type="submit" className="btn">
+          <button type="submit" className="btn toolbar-icon-btn" title="Search" aria-label="Search">
             <Icon d="M11 19a8 8 0 100-16 8 8 0 000 16zM21 21l-4.3-4.3" />
-            Search
           </button>
         </form>
-        <button type="button" className="btn-secondary" onClick={() => load(null)} disabled={loading}>
-          <Icon d="M21 12a9 9 0 11-2.64-6.36M21 3v6h-6" />
-          Refresh
-        </button>
       </div>
-
-      {error ? <div className="error banner">{error}</div> : null}
 
       <div className="list">
         {messages.map((msg) => (
@@ -599,6 +722,10 @@ export default function App() {
   const [user, setUser] = useState(() => (getToken() ? 'user' : ''))
   const [screen, setScreen] = useState('inbox')
   const [hostTick, setHostTick] = useState(0)
+  const [folder, setFolder] = useState('all')
+  const [filter, setFilter] = useState('all')
+  const [search, setSearch] = useState('')
+  const [timeRange, setTimeRange] = useState(DEFAULT_TIME_RANGE)
 
   function logout() {
     setToken('')
@@ -621,11 +748,40 @@ export default function App() {
     )
   }
 
+  if (screen === 'maps') {
+    return (
+      <MapsScreen
+        folder={folder}
+        setFolder={setFolder}
+        filter={filter}
+        setFilter={setFilter}
+        search={search}
+        setSearch={setSearch}
+        timeRange={timeRange}
+        setTimeRange={setTimeRange}
+        onBack={() => setScreen('inbox')}
+        onLogout={logout}
+        renderCard={(msg, onPatch) => (
+          <MessageRow key={msg.id || msg.messageId} msg={msg} onPatch={onPatch} defaultOpen />
+        )}
+      />
+    )
+  }
+
   return (
     <Inbox
       key={hostTick}
       onOpenSettings={() => setScreen('settings')}
+      onOpenMaps={() => setScreen('maps')}
       onLogout={logout}
+      folder={folder}
+      setFolder={setFolder}
+      filter={filter}
+      setFilter={setFilter}
+      search={search}
+      setSearch={setSearch}
+      timeRange={timeRange}
+      setTimeRange={setTimeRange}
     />
   )
 }

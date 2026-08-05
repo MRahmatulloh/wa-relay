@@ -75,41 +75,79 @@ class ExtractOut(BaseModel):
     parseSource: str = "own_model"
 
 
+def _coerce_job(item: Any) -> dict[str, Any] | None:
+    if not isinstance(item, dict):
+        return None
+    price = item.get("price")
+    try:
+        price_n = float(price) if price is not None else None
+    except (TypeError, ValueError):
+        price_n = None
+    job = {
+        "from": item.get("from"),
+        "to": item.get("to"),
+        "price": price_n,
+        "currency": item.get("currency") or "GBP",
+    }
+    if job.get("from") or job.get("to") or job.get("price") is not None:
+        return job
+    return None
+
+
+def _repair_json_text(s: str) -> str:
+    """Fix common Flan-T5 slips like ["from":"LHR",...] → [{"from":"LHR",...}]."""
+    t = s.strip()
+    # Single job object written with array brackets
+    if re.match(r'^\[\s*"(?:from|to|price|currency)"\s*:', t):
+        t = "[{" + t[1:]
+        if t.endswith("]") and not t.endswith("}]"):
+            t = t[:-1] + "}]"
+    # Bare object
+    if t.startswith("{") and '"jobs"' not in t and re.search(r'"(?:from|to)"\s*:', t):
+        t = f"[{t}]"
+    return t
+
+
 def parse_jobs_json(raw: str) -> list[dict[str, Any]]:
     s = raw.strip()
     # Model may wrap in markdown fences
     s = re.sub(r"^```(?:json)?\s*", "", s)
     s = re.sub(r"\s*```$", "", s)
-    try:
-        data = json.loads(s)
-    except json.JSONDecodeError:
-        m = re.search(r"\[.*\]", s, re.S)
-        if not m:
-            return []
+
+    candidates = [s, _repair_json_text(s)]
+    m = re.search(r"[\[{].*[\]}]", s, re.S)
+    if m:
+        candidates.append(m.group(0))
+        candidates.append(_repair_json_text(m.group(0)))
+
+    data = None
+    for cand in candidates:
         try:
-            data = json.loads(m.group(0))
+            data = json.loads(cand)
+            break
         except json.JSONDecodeError:
-            return []
-    if not isinstance(data, list):
-        return []
-    jobs: list[dict[str, Any]] = []
-    for item in data:
-        if not isinstance(item, dict):
             continue
-        price = item.get("price")
-        try:
-            price_n = float(price) if price is not None else None
-        except (TypeError, ValueError):
-            price_n = None
-        jobs.append(
-            {
-                "from": item.get("from"),
-                "to": item.get("to"),
-                "price": price_n,
-                "currency": item.get("currency") or "GBP",
-            }
-        )
-    return [j for j in jobs if j.get("from") or j.get("to") or j.get("price") is not None]
+    if data is None:
+        return []
+
+    if isinstance(data, dict):
+        if isinstance(data.get("jobs"), list):
+            items = data["jobs"]
+        elif any(k in data for k in ("from", "to", "price")):
+            items = [data]
+        else:
+            return []
+    elif isinstance(data, list):
+        items = data
+    else:
+        return []
+
+    jobs: list[dict[str, Any]] = []
+    for item in items:
+        job = _coerce_job(item)
+        if job:
+            jobs.append(job)
+    return jobs
 
 
 @app.get("/health")

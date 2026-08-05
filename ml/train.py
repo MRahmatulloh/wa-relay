@@ -139,14 +139,17 @@ def main() -> None:
         )
 
     collator = DataCollatorForSeq2Seq(tokenizer=tokenizer, model=model)
-    trainer = Seq2SeqTrainer(
+    trainer_kwargs = dict(
         model=model,
         args=training_args,
         train_dataset=train_ds,
         eval_dataset=val_ds,
-        tokenizer=tokenizer,
         data_collator=collator,
     )
+    try:
+        trainer = Seq2SeqTrainer(**trainer_kwargs, processing_class=tokenizer)
+    except TypeError:
+        trainer = Seq2SeqTrainer(**trainer_kwargs, tokenizer=tokenizer)
     trainer.train()
     trainer.save_model(str(args.out))
     tokenizer.save_pretrained(str(args.out))

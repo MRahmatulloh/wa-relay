@@ -38,8 +38,39 @@ function toRow(doc, extracted) {
   };
 }
 
+function looksLikePlace(s) {
+  if (!s || typeof s !== 'string') return false;
+  const t = s.trim();
+  if (t.length < 2 || t.length > 80) return false;
+  if (/^(today|tomorrow|yesterday)\b/i.test(t) && !/\b[A-Z]{1,2}\d/i.test(t)) return false;
+  if (/^(mpv|van|saloon|estate|executive|minibus)\b/i.test(t)) return false;
+  if (/\b\d?\s*seater\b/i.test(t) && !/\b[A-Z]{1,2}\d/i.test(t)) return false;
+  if (/^(pick[\s-]?up|drop[\s-]?off|up\)|landing|pair|connection)\b/i.test(t)) return false;
+  if (/^\d{1,2}([.:]\d{2})?\s*(am|pm)?$/i.test(t)) return false;
+  return true;
+}
+
 function isTrainable(row) {
-  return row.jobs.some((j) => j.from && j.to);
+  return row.jobs.some(
+    (j) =>
+      looksLikePlace(j.from) &&
+      looksLikePlace(j.to) &&
+      String(j.from).toUpperCase().replace(/\s+/g, '') !==
+        String(j.to).toUpperCase().replace(/\s+/g, ''),
+  );
+}
+
+function cleanTrainableJobs(row) {
+  return {
+    ...row,
+    jobs: (row.jobs || []).filter(
+      (j) =>
+        looksLikePlace(j.from) &&
+        looksLikePlace(j.to) &&
+        String(j.from).toUpperCase().replace(/\s+/g, '') !==
+          String(j.to).toUpperCase().replace(/\s+/g, ''),
+    ),
+  };
 }
 
 function splitTrainVal(rows, seed = 42) {
@@ -91,7 +122,7 @@ async function main() {
     if (!row.jobs.length || row.parseStatus === 'empty') empty++;
   }
 
-  const trainable = all.filter(isTrainable);
+  const trainable = all.filter(isTrainable).map(cleanTrainableJobs);
   const { train, val } = splitTrainVal(trainable);
 
   writeJsonl(path.join(outDir, 'all.silver.jsonl'), all);

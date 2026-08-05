@@ -6,6 +6,12 @@ const jobSchema = new mongoose.Schema(
     to: { type: String, default: null },
     price: { type: Number, default: null },
     currency: { type: String, default: 'GBP' },
+    fromLat: { type: Number, default: null },
+    fromLng: { type: Number, default: null },
+    toLat: { type: Number, default: null },
+    toLng: { type: Number, default: null },
+    distanceMiles: { type: Number, default: null },
+    pricePerMile: { type: Number, default: null },
   },
   { _id: false },
 );
@@ -25,6 +31,7 @@ const messageSchema = new mongoose.Schema(
     jobs: { type: [jobSchema], default: [] },
     parseStatus: { type: String, default: 'empty' },
     parseSource: { type: String, default: null },
+    parseBug: { type: Boolean, default: false },
     timestamp: { type: Date, required: true },
     readAt: { type: Date, default: null },
     starred: { type: Boolean, default: false },
@@ -44,6 +51,7 @@ messageSchema.index({ thumbsUp: 1, createdAt: -1 });
 messageSchema.index({ text: 1, senderPhone: 1, timestamp: -1 });
 messageSchema.index({ text: 1, participantJid: 1, timestamp: -1 });
 messageSchema.index({ parseStatus: 1, createdAt: -1 });
+messageSchema.index({ parseBug: 1, createdAt: -1 });
 
 export const Message = mongoose.model('Message', messageSchema);
 
@@ -66,10 +74,17 @@ export function serializeMessage(m) {
           to: j.to || null,
           price: j.price == null ? null : Number(j.price),
           currency: j.currency || 'GBP',
+          fromLat: j.fromLat == null ? null : Number(j.fromLat),
+          fromLng: j.fromLng == null ? null : Number(j.fromLng),
+          toLat: j.toLat == null ? null : Number(j.toLat),
+          toLng: j.toLng == null ? null : Number(j.toLng),
+          distanceMiles: j.distanceMiles == null ? null : Number(j.distanceMiles),
+          pricePerMile: j.pricePerMile == null ? null : Number(j.pricePerMile),
         }))
       : [],
     parseStatus: m.parseStatus || 'empty',
     parseSource: m.parseSource || null,
+    parseBug: !!m.parseBug,
     timestamp: m.timestamp,
     createdAt: m.createdAt,
     readAt: m.readAt || null,

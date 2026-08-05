@@ -17,7 +17,9 @@ const FOLDERS = ['all', 'lgw', 'lhr', 'ltn', 'stn', 'others']
 const FILTERS = [
   { id: 'all', label: 'All' },
   { id: 'unread', label: 'Unread' },
+  { id: 'read', label: 'Read' },
   { id: 'starred', label: 'Starred' },
+  { id: 'thumbsUp', label: 'Thumbs up' },
   { id: 'done', label: 'Done' },
   { id: 'parseBug', label: 'Parse bugs' },
 ]
@@ -31,11 +33,36 @@ function formatJobs(jobs) {
     j.price != null && Number.isFinite(Number(j.price))
       ? `£${Number(j.price)}`
       : null
-  if (!from && !to && !price) return null
+
+  // Multi-leg + one total fare: show combined miles for £/mi consistency
+  let milesNum =
+    j.distanceMiles != null && Number.isFinite(Number(j.distanceMiles))
+      ? Number(j.distanceMiles)
+      : null
+  let perMileNum =
+    j.pricePerMile != null && Number.isFinite(Number(j.pricePerMile))
+      ? Number(j.pricePerMile)
+      : null
+  if (jobs.length > 1 && j.price != null) {
+    const sum = jobs.reduce((s, x) => {
+      const d = x.distanceMiles
+      return s + (d != null && Number.isFinite(Number(d)) ? Number(d) : 0)
+    }, 0)
+    if (sum > 0) {
+      milesNum = Math.round(sum * 10) / 10
+      perMileNum = Math.round((Number(j.price) / sum) * 100) / 100
+    }
+  }
+
+  const miles = milesNum != null ? `${milesNum} mi` : null
+  const perMile = perMileNum != null ? `£${perMileNum}/mi` : null
+  if (!from && !to && !price && !miles) return null
   return {
     from,
     to,
     price,
+    miles,
+    perMile,
     extra: jobs.length > 1 ? jobs.length - 1 : 0,
   }
 }
@@ -44,7 +71,12 @@ function formatTime(iso) {
   if (!iso) return '—'
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return '—'
-  return d.toLocaleString()
+  return d.toLocaleString(undefined, {
+    day: '2-digit',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
 }
 
 function Icon({ d, children }) {
@@ -58,7 +90,6 @@ function Icon({ d, children }) {
 function Login({ onOk }) {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
-  const [host, setHostDraft] = useState(getHost())
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
 
@@ -67,7 +98,6 @@ function Login({ onOk }) {
     setBusy(true)
     setError('')
     try {
-      setHost(host)
       const data = await login(username.trim(), password)
       setToken(data.token)
       onOk(data.username || username)
@@ -82,16 +112,6 @@ function Login({ onOk }) {
     <div className="login-wrap">
       <form className="login-card" onSubmit={submit}>
         <h1>WA Relay Admin</h1>
-        <p className="muted">Inbox · extracted jobs · folders</p>
-        <label>
-          API host
-          <input
-            value={host}
-            onChange={(e) => setHostDraft(e.target.value)}
-            placeholder="(empty = same origin)"
-            autoComplete="url"
-          />
-        </label>
         <label>
           Username
           <input
@@ -141,6 +161,12 @@ function MessageRow({ msg, onPatch }) {
   const unread = !msg.readAt
   const waHref = buildWaMeUrl(msg.waLink, msg.text)
 
+  function toggleOpen() {
+    const next = !open
+    setOpen(next)
+    if (next && unread) onPatch(msg, { read: true })
+  }
+
   async function copyText(e) {
     e.stopPropagation()
     try {
@@ -154,14 +180,19 @@ function MessageRow({ msg, onPatch }) {
 
   return (
     <article className={`msg ${unread ? 'unread' : ''}`}>
-      <button type="button" className="msg-main" onClick={() => setOpen((v) => !v)}>
+      <button type="button" className="msg-main" onClick={toggleOpen}>
         <div className="msg-top">
-          <strong>
+          <span className={`unread-dot ${unread ? 'on' : ''}`} aria-hidden="true" />
+          <strong className={unread ? 'msg-title-unread' : undefined}>
             {msg.senderName || msg.senderPhone || 'Unknown'}
             {msg.isGroup && msg.groupName ? ` · ${msg.groupName}` : ''}
           </strong>
           <span className="chip">{(msg.folder || 'others').toUpperCase()}</span>
-          <span className="muted small">{formatTime(msg.createdAt || msg.timestamp)}</span>
+          <span className="chip times muted small">
+            In: {formatTime(msg.createdAt || msg.timestamp)}
+            {' · '}
+            Read: {formatTime(msg.readAt)}
+          </span>
         </div>
         {jobsLine ? (
           <div className="jobs">
@@ -173,15 +204,18 @@ function MessageRow({ msg, onPatch }) {
               </span>
             ) : null}
             {jobsLine.price ? <span className="jobs-price">{jobsLine.price}</span> : null}
+            {jobsLine.miles ? <span className="jobs-miles">{jobsLine.miles}</span> : null}
+            {jobsLine.perMile ? <span className="jobs-per-mile">{jobsLine.perMile}</span> : null}
             {jobsLine.extra ? <span className="jobs-extra">+{jobsLine.extra}</span> : null}
           </div>
         ) : null}
-        <div className={`preview ${open ? 'full' : ''}`}>{msg.text}</div>
+        {open ? <div className="preview full">{msg.text}</div> : null}
         <div className="meta muted small">
           parse: {msg.parseStatus || '—'}
           {msg.parseSource ? ` · ${msg.parseSource}` : ''}
           {msg.parseBug ? ' · parse bug' : ''}
           {msg.starred ? ' · ★' : ''}
+          {msg.thumbsUp ? ' · 👍' : ''}
           {msg.done ? ' · done' : ''}
         </div>
       </button>
@@ -197,13 +231,6 @@ function MessageRow({ msg, onPatch }) {
           <button type="button" onClick={() => onPatch(msg, { done: !msg.done })}>
             <Icon d="M20 6L9 17l-5-5" />
             {msg.done ? 'Undone' : 'Done'}
-          </button>
-          <button type="button" onClick={() => onPatch(msg, { read: unread })}>
-            <Icon d={unread
-              ? 'M4 4h16v12H5.17L4 17.17V4zm0 0l8 6 8-6'
-              : 'M3 8l9 6 9-6M4 6h16v12H4z'}
-            />
-            {unread ? 'Mark read' : 'Mark unread'}
           </button>
           <button type="button" onClick={copyText}>
             <Icon d="M8 8h10v12H8zM6 4h10v2H6z" />
@@ -395,14 +422,13 @@ function Settings({ username, onBack, onLogout, onHostSaved }) {
   )
 }
 
-function Inbox({ username, onLogout, onOpenSettings }) {
+function Inbox({ onLogout, onOpenSettings }) {
   const [folder, setFolder] = useState('all')
   const [filter, setFilter] = useState('all')
   const [q, setQ] = useState('')
   const [search, setSearch] = useState('')
   const [messages, setMessages] = useState([])
   const [counts, setCounts] = useState({})
-  const [health, setHealth] = useState(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [nextCursor, setNextCursor] = useState(null)
@@ -410,7 +436,9 @@ function Inbox({ username, onLogout, onOpenSettings }) {
   const query = useMemo(() => {
     const base = { folder: folder === 'all' ? undefined : folder, q: search || undefined, limit: 40 }
     if (filter === 'unread') base.unread = true
+    if (filter === 'read') base.unread = false
     if (filter === 'starred') base.starred = true
+    if (filter === 'thumbsUp') base.thumbsUp = true
     if (filter === 'done') base.done = true
     if (filter === 'parseBug') base.parseBug = true
     return base
@@ -426,8 +454,6 @@ function Inbox({ username, onLogout, onOpenSettings }) {
         setNextCursor(data.nextCursor)
         const c = await fetchUnreadByFolder().catch(() => null)
         if (c?.counts) setCounts(c.counts)
-        const h = await fetchHealth().catch(() => null)
-        if (h) setHealth(h)
       } catch (err) {
         if (err.code === 401) {
           setToken('')
@@ -466,13 +492,23 @@ function Inbox({ username, onLogout, onOpenSettings }) {
 
   async function onPatch(msg, patch) {
     try {
-      const body = { ...patch }
-      if ('read' in body) {
-        body.read = body.read
-      }
-      const data = await patchMessage(msg.id, body)
+      const wasUnread = !msg.readAt
+      const data = await patchMessage(msg.id, patch)
       const updated = data.message || data
-      setMessages((prev) => prev.map((m) => (m.id === msg.id ? { ...m, ...updated } : m)))
+      setMessages((prev) =>
+        prev
+          .map((m) => (m.id === msg.id ? { ...m, ...updated } : m))
+          .filter((m) => {
+            if (m.id !== msg.id) return true
+            if (filter === 'unread' && m.readAt) return false
+            if (filter === 'read' && !m.readAt) return false
+            return true
+          }),
+      )
+      if ('read' in patch || (wasUnread && updated.readAt)) {
+        const c = await fetchUnreadByFolder().catch(() => null)
+        if (c?.counts) setCounts(c.counts)
+      }
     } catch (err) {
       setError(err.message)
     }
@@ -483,12 +519,6 @@ function Inbox({ username, onLogout, onOpenSettings }) {
       <header className="top">
         <div>
           <h1>WA Relay</h1>
-          <p className="muted">
-            {username}
-            {health?.whatsapp
-              ? ` · WA ${health.whatsapp.status}${health.whatsapp.connected ? '' : ' (offline)'}`
-              : ''}
-          </p>
         </div>
         <div className="top-actions">
           <button type="button" className="btn-secondary icon-btn" onClick={onOpenSettings} title="Settings">
@@ -594,7 +624,6 @@ export default function App() {
   return (
     <Inbox
       key={hostTick}
-      username={user}
       onOpenSettings={() => setScreen('settings')}
       onLogout={logout}
     />

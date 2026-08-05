@@ -9,7 +9,8 @@
     "user:create": "node src/cli/create-user.js",
     "dataset:export": "node src/cli/export-jobs-dataset.js",
     "jobs:backfill": "node src/cli/backfill-jobs.js",
-    "test:extract": "node --test src/services/jobExtract.test.js src/services/geminiExtract.test.js"
+    "distance:backfill": "node src/cli/backfill-distance.js",
+    "test:extract": "node --test src/services/jobExtract.test.js src/services/geminiExtract.test.js src/services/jobDistance.test.js"
   },
   "dependencies": {
     "@hapi/boom": "^9.1.4",

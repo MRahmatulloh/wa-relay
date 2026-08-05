@@ -30,6 +30,9 @@ function buildListFilter(query) {
   const thumbsUp = parseBool(query.thumbsUp);
   if (thumbsUp !== null) filter.thumbsUp = thumbsUp;
 
+  const parseBug = parseBool(query.parseBug);
+  if (parseBug !== null) filter.parseBug = parseBug;
+
   const isGroup = parseBool(query.isGroup);
   if (isGroup !== null) filter.isGroup = isGroup;
 
@@ -168,13 +171,14 @@ router.patch('/:id', authMiddleware, async (req, res) => {
     const update = {};
     if (typeof req.body.starred === 'boolean') update.starred = req.body.starred;
     if (typeof req.body.done === 'boolean') update.done = req.body.done;
+    if (typeof req.body.parseBug === 'boolean') update.parseBug = req.body.parseBug;
     if (typeof req.body.read === 'boolean') {
       update.readAt = req.body.read ? new Date() : null;
     }
     const hasThumbsUp = typeof req.body.thumbsUp === 'boolean';
 
     if (!Object.keys(update).length && !hasThumbsUp) {
-      return res.status(400).json({ error: 'No valid fields (read, starred, done, thumbsUp)' });
+      return res.status(400).json({ error: 'No valid fields (read, starred, done, thumbsUp, parseBug)' });
     }
 
     const existing = await Message.findById(id).lean();

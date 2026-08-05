@@ -24,6 +24,12 @@ export const config = {
   geminiApiKey: String(process.env.GEMINI_API_KEY || '').trim(),
   geminiModel: String(process.env.GEMINI_MODEL || 'gemini-2.0-flash').trim(),
   geminiTimeoutMs: Math.max(500, Number(process.env.GEMINI_TIMEOUT_MS) || 8000),
+  /** Nominatim geocode base (no trailing slash). */
+  nominatimUrl: String(process.env.NOMINATIM_URL || 'https://nominatim.openstreetmap.org').replace(/\/$/, ''),
+  /** OSRM route base (no trailing slash). */
+  osrmUrl: String(process.env.OSRM_URL || 'https://router.project-osrm.org').replace(/\/$/, ''),
+  /** Min ms between Nominatim requests (public API ~1 req/s). */
+  nominatimMinIntervalMs: Math.max(0, Number(process.env.NOMINATIM_MIN_INTERVAL_MS) || 1100),
   /** QR page HTTP Basic Auth. Default on; set QR_BASIC_AUTH=false to disable. */
   qrBasicAuth: !['0', 'false', 'no', 'off'].includes(
     String(process.env.QR_BASIC_AUTH ?? 'true').toLowerCase(),

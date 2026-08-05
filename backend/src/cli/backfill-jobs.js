@@ -5,6 +5,31 @@ import { config } from '../config.js';
 import { Message } from '../models/Message.js';
 import { extractJobsRules } from '../services/jobExtract.js';
 
+/** Keep geocode / miles when from→to (and price) still match after re-parse. */
+function mergePreservedGeo(prevJobs, nextJobs) {
+  const prev = Array.isArray(prevJobs) ? prevJobs : [];
+  return (Array.isArray(nextJobs) ? nextJobs : []).map((job, i) => {
+    const old = prev[i];
+    if (
+      !old ||
+      old.from !== job.from ||
+      old.to !== job.to ||
+      (old.price != null && job.price != null && Number(old.price) !== Number(job.price))
+    ) {
+      return job;
+    }
+    return {
+      ...job,
+      fromLat: old.fromLat ?? job.fromLat ?? null,
+      fromLng: old.fromLng ?? job.fromLng ?? null,
+      toLat: old.toLat ?? job.toLat ?? null,
+      toLng: old.toLng ?? job.toLng ?? null,
+      distanceMiles: old.distanceMiles ?? job.distanceMiles ?? null,
+      pricePerMile: old.pricePerMile ?? job.pricePerMile ?? null,
+    };
+  });
+}
+
 async function main() {
   const force = process.argv.includes('--force');
   await mongoose.connect(config.mongoUri);
@@ -23,7 +48,7 @@ async function main() {
   for await (const doc of cursor) {
     n++;
     const extracted = extractJobsRules(doc.text || '');
-    doc.jobs = extracted.jobs;
+    doc.jobs = mergePreservedGeo(doc.jobs, extracted.jobs);
     doc.parseStatus = extracted.parseStatus;
     doc.parseSource = extracted.parseSource;
     await doc.save();

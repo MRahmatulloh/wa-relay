@@ -13,6 +13,7 @@ import { config } from '../config.js';
 import { Message, serializeMessage } from '../models/Message.js';
 import { matchPattern } from './patterns.js';
 import { extractJobs } from './jobExtract.js';
+import { enrichJobsGeo } from './jobDistance.js';
 import { sendMatchedPush } from './fcm.js';
 
 let sock = null;
@@ -132,6 +133,12 @@ async function handleIncoming(msg) {
   }
 
   const extracted = await extractJobs(text);
+  let jobs = extracted.jobs;
+  try {
+    jobs = await enrichJobsGeo(jobs);
+  } catch (err) {
+    console.error('job distance enrich error', err?.message || err);
+  }
 
   let saved;
   try {
@@ -149,7 +156,7 @@ async function handleIncoming(msg) {
         waLink,
         matchedPattern,
         folder,
-        jobs: extracted.jobs,
+        jobs,
         parseStatus: extracted.parseStatus,
         parseSource: extracted.parseSource,
         timestamp,
